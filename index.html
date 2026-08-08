@@ -29,9 +29,11 @@
   <div class="panel" id="setup">
     <h2>
       Settings
-      <button class="toggle" id="toggle-settings">show / hide</button>
+      <button id="toggle-settings" aria-expanded="true" aria-controls="setup-body">
+        <span class="chev">▼</span><span id="toggle-label">Hide</span>
+      </button>
     </h2>
-    <div class="collapsible">
+    <div class="collapsible" id="setup-body">
       <p class="sub">
         Everything runs in your browser using <strong>your own</strong> API keys. Keys are stored
         only in this browser's local storage and are sent directly to the provider you choose —
@@ -81,9 +83,15 @@
     </div>
   </div>
 
-  <div class="panel">
+  <div class="tabs">
+    <button class="tab active" id="tab-upload">📁 Upload a recording</button>
+    <button class="tab" id="tab-live">🎙 Live captions</button>
+  </div>
+
+  <div class="panel" id="pane-upload">
     <h2>Upload a recording</h2>
-    <p class="sub">Audio or video — m4a, mp3, wav, mp4 and more. A one-hour file takes roughly 5–10 minutes.</p>
+    <p class="sub">Audio or video — m4a, mp3, wav, mp4 and more. A one-hour file takes roughly
+      5–10 minutes, and gives you <strong>speaker separation</strong>.</p>
     <div id="drop">
       <div class="big">Drop a file here, or click to choose</div>
       <div class="small" id="fname">No file selected</div>
@@ -93,6 +101,28 @@
       <button class="bar primary" id="go" disabled>Transcribe</button>
     </div>
     <div id="status"></div>
+  </div>
+
+  <div class="panel" id="pane-live" style="display:none">
+    <h2>Live captions</h2>
+    <p class="sub">Transcribes from your microphone as you speak, using your browser's built-in
+      speech engine — <strong>free, no API key</strong>. When you stop, the text becomes a normal
+      transcript you can search, summarize and export.
+      <br>No speaker separation in this mode — use Upload for that. Note that browsers implement
+      this by sending audio to their own speech service (Google's, in Chrome), so for
+      confidential material use Upload mode instead.</p>
+    <div class="row-2">
+      <div>
+        <label class="field" for="lang">Language</label>
+        <select id="lang"></select>
+      </div>
+      <button class="bar primary" id="livego">● Start listening</button>
+    </div>
+    <div id="livebox">
+      <div id="livetext"></div>
+      <span id="interim"></span>
+    </div>
+    <div class="note" id="livenote"></div>
   </div>
 
   <div id="toolbar">

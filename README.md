@@ -4,7 +4,8 @@
 
 Turn any recording into a speaker-separated, searchable transcript — every sentence labelled
 by speaker, each one clickable to play that exact moment, with AI summaries and export to
-text, Markdown, subtitles or JSON.
+text, Markdown, subtitles or JSON. Or switch to **live captions** and transcribe straight
+from your microphone, free and with no API key.
 
 It runs **entirely in your browser** with **your own API key**. Your audio goes straight from
 your machine to the transcription provider you chose. There is no server in the middle,
@@ -32,6 +33,10 @@ under NDA — cloud transcription is usually off the table. That's the gap this 
 
 ## Features
 
+- **Two modes** — upload a file for speaker-separated transcripts, or live captions from your mic
+- **Live captions** — real-time transcription in 10 languages using the browser's own speech
+  engine. Free, no API key, nothing uploaded. Stop, and it becomes a normal transcript you can
+  search, summarize and export.
 - **Speaker separation** — up to six speakers, colour-coded
 - **Click any line to play it** — jumps straight to that moment
 - **Rename speakers** — "Speaker A" → "Sarah", updates everywhere including exports
@@ -45,8 +50,18 @@ under NDA — cloud transcription is usually off the table. That's the gap this 
 
 ### The web page — nothing to install
 
-Open the [demo](https://xcai2.github.io/speaker-transcript/), paste your AssemblyAI key into
-Settings, drop in a file. Optionally add a model provider key for summaries.
+Open the [demo](https://xcai2.github.io/speaker-transcript/) and pick a mode:
+
+**📁 Upload a recording** — paste your AssemblyAI key into Settings, then drop in a file.
+Gives you speaker separation and the highest accuracy.
+
+**🎙 Live captions** — click Start listening and talk. No key, no cost. No speaker separation
+in this mode, and note that browsers implement this by sending audio to their own speech
+service (Google's, in Chrome) — so for confidential material, use Upload mode instead.
+
+![Live captions](docs/live.png)
+
+Optionally add a model provider key for AI summaries in either mode.
 
 ### The Python script — for batch and long files
 
@@ -105,6 +120,7 @@ responsible for having the right to record and process any audio you use here.
 |---|---|
 | `index.html` | The web app |
 | `app.js` | Upload, transcription, rendering, search, summary |
+| `live.js` | Live captions via the Web Speech API |
 | `transcript.js` | Sentence splitting and every export format |
 | `llm.js` | Model provider clients |
 | `transcribe.py` | The CLI version |

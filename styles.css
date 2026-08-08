@@ -41,6 +41,18 @@ main { max-width: 860px; margin: 0 auto; padding: 20px 16px 140px; }
 .panel h2 { font-size: 15px; margin: 0; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 .panel h2 .toggle { margin-left: auto; font-size: 12px; color: var(--muted); cursor: pointer;
                     background: none; border: none; font-weight: 600; }
+/* Settings toggle: a real button, tinted so it reads as the way in. */
+#toggle-settings { margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer; font-size: 12.5px; font-weight: 600; border-radius: 8px; padding: 6px 12px;
+  color: var(--a); background: color-mix(in srgb, var(--a) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--a) 32%, transparent); transition: background .15s; }
+#toggle-settings:hover { background: color-mix(in srgb, var(--a) 18%, transparent); }
+#toggle-settings .chev { transition: transform .18s; font-size: 10px; }
+#setup.collapsed #toggle-settings .chev { transform: rotate(-90deg); }
+/* Draw attention to Settings until a transcription key exists. */
+#toggle-settings.needskey { color: #b45309; background: color-mix(in srgb, #d97706 14%, transparent);
+  border-color: color-mix(in srgb, #d97706 40%, transparent); }
+@media (prefers-color-scheme: dark) { #toggle-settings.needskey { color: #fbbf24; } }
 .panel p.sub { font-size: 13px; color: var(--muted); margin: 6px 0 14px; line-height: 1.6; }
 .panel p.sub a, .note a { color: var(--a); }
 #setup.collapsed .collapsible { display: none; }
@@ -56,6 +68,27 @@ input[type=password], input[type=text], select {
 .note.err { color: #b91c1c; }
 @media (prefers-color-scheme: dark) { .note.err { color: #fca5a5; } }
 .sep { height: 1px; background: var(--line); margin: 16px 0; }
+
+/* mode tabs */
+.tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.tab { flex: 1; cursor: pointer; font-size: 13.5px; font-weight: 600; padding: 10px 14px;
+       border-radius: 10px; border: 1px solid var(--line); background: var(--card);
+       color: var(--muted); transition: background .15s, color .15s, border-color .15s; }
+.tab:hover { background: var(--hover); }
+.tab.active { color: var(--a); border-color: color-mix(in srgb, var(--a) 40%, transparent);
+              background: color-mix(in srgb, var(--a) 10%, transparent); }
+
+/* live captions */
+#livebox { margin-top: 14px; padding: 16px; border-radius: 10px; background: var(--bg);
+           border: 1px solid var(--line); min-height: 130px; max-height: 320px; overflow-y: auto;
+           font-size: 15px; line-height: 1.75; }
+#livebox:empty::before { content: 'Captions will appear here…'; color: var(--faint); }
+#livetext p { margin: 0 0 8px; }
+#interim { color: var(--faint); font-style: italic; }
+#livego.listening { background: #dc2626; border-color: #dc2626; }
+#livego.listening::before { content: ''; display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: #fff; margin-right: 7px; animation: pulse 1.2s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
 
 /* dropzone */
 #drop { border: 2px dashed var(--line); border-radius: 12px; padding: 26px 20px;

@@ -3,6 +3,7 @@ import {
   fmtTime, talkTime,
 } from './transcript.js';
 import { PROVIDERS, summarize, buildPrompt, estimateTokens } from './llm.js';
+import { LiveSession, isSupported as liveSupported, LANGS } from './live.js';
 
 const API = 'https://api.assemblyai.com/v2';
 const $ = id => document.getElementById(id);
@@ -79,7 +80,18 @@ $('addmodel').onclick = () => {
   if (m) { modelSel.append(new Option(m, m)); modelSel.value = m; }
 };
 
-$('toggle-settings').onclick = () => $('setup').classList.toggle('collapsed');
+function syncSettingsToggle() {
+  const collapsed = $('setup').classList.contains('collapsed');
+  $('toggle-label').textContent = collapsed ? 'Settings' : 'Hide';
+  $('toggle-settings').setAttribute('aria-expanded', String(!collapsed));
+  // amber until a transcription key is set, so the way in is obvious
+  $('toggle-settings').classList.toggle('needskey', !keyInput.value.trim());
+}
+$('toggle-settings').onclick = () => {
+  $('setup').classList.toggle('collapsed');
+  syncSettingsToggle();
+};
+syncSettingsToggle();
 
 /* ---------------- file picking ---------------- */
 const drop = $('drop'), fileInput = $('file');
@@ -97,7 +109,10 @@ function setFile(f) {
   $('fname').textContent = f.name + '  (' + (f.size / 1048576).toFixed(1) + ' MB)';
   refresh();
 }
-function refresh() { $('go').disabled = !(picked && keyInput.value.trim()); }
+function refresh() {
+  $('go').disabled = !(picked && keyInput.value.trim());
+  syncSettingsToggle();
+}
 
 function say(msg, isErr) {
   statusEl.textContent = msg;
@@ -150,6 +165,89 @@ $('go').onclick = async () => {
   }
 };
 
+/* ---------------- live captions ---------------- */
+let live = null;
+
+for (const [code, label] of LANGS) $('lang').append(new Option(label, code));
+$('lang').value = localStorage.getItem('live_lang') || 'en-US';
+$('lang').onchange = () => {
+  localStorage.setItem('live_lang', $('lang').value);
+  if (live) live.setLang($('lang').value);
+};
+
+function showMode(mode) {
+  const up = mode === 'upload';
+  $('pane-upload').style.display = up ? '' : 'none';
+  $('pane-live').style.display = up ? 'none' : '';
+  $('tab-upload').classList.toggle('active', up);
+  $('tab-live').classList.toggle('active', !up);
+  if (!up && !liveSupported()) {
+    $('livego').disabled = true;
+    $('livenote').className = 'note err';
+    $('livenote').textContent =
+      'Your browser does not support the Web Speech API. Live captions work in Chrome, Edge and Safari; Firefox is not supported.';
+  }
+}
+$('tab-upload').onclick = () => showMode('upload');
+$('tab-live').onclick = () => showMode('live');
+
+$('livego').onclick = () => {
+  if (live && live.wanted) { stopLive(); return; }
+
+  const liveText = $('livetext');
+  liveText.textContent = '';
+  $('interim').textContent = '';
+
+  live = new LiveSession({
+    lang: $('lang').value,
+    onFinal: ({ text, at }) => {
+      const p = document.createElement('p');
+      const t = document.createElement('span');
+      t.className = 'time';
+      t.textContent = fmtTime(at) + '  ';
+      p.append(t, document.createTextNode(text));
+      liveText.append(p);
+      $('livebox').scrollTop = $('livebox').scrollHeight;
+    },
+    onInterim: t => { $('interim').textContent = t; },
+    onState: state => {
+      const running = state === 'running';
+      $('livego').classList.toggle('listening', running);
+      $('livego').textContent = running ? 'Stop listening' : '● Start listening';
+      if (running) { $('livenote').className = 'note'; $('livenote').textContent = 'Listening… speak normally.'; }
+    },
+    onError: msg => { $('livenote').className = 'note err'; $('livenote').textContent = msg; },
+  });
+  live.start();
+  window.__live = live;   // exposed for tests
+};
+
+function stopLive() {
+  if (!live) return;
+  live.stop();
+  $('interim').textContent = '';
+  const segs = live.toSegments();
+  if (!segs.length) {
+    $('livenote').className = 'note';
+    $('livenote').textContent = 'Nothing was captured.';
+    return;
+  }
+  // hand the captured text to the same pipeline the upload path uses
+  segments = segs;
+  names = { A: 'Me' };
+  baseName = 'live-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  audio.removeAttribute('src');
+  $('player').classList.remove('show');
+  $('toolbar').classList.add('show');
+  $('hint').textContent = 'Live session captured — search, summarize or export it';
+  drawRows();
+  drawStats();
+  applySearch();
+  $('livenote').className = 'note';
+  $('livenote').textContent = segs.length + ' lines captured. They are now in the transcript below.';
+  $('list').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 /* ---------------- render ---------------- */
 function speakerClass(s) {
   const c = String(s).toUpperCase().charCodeAt(0);
@@ -171,6 +269,7 @@ function render(t) {
   $('hint').textContent = 'Click a speaker button to play that segment';
   statusEl.className = '';
   $('setup').classList.add('collapsed');
+  syncSettingsToggle();
 
   drawRows();
   drawStats();
@@ -186,12 +285,19 @@ function drawRows() {
 
     const btn = document.createElement('button');
     btn.className = 'btn ' + speakerClass(seg.speaker);
-    btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+    // live sessions have no audio to seek, so the play affordance is dropped there
+    const playable = !!audio.getAttribute('src');
+    if (playable) btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
     const nm = document.createElement('span');
     nm.textContent = nameOf(seg.speaker);
     btn.append(nm);
-    btn.title = 'Play ' + fmtTime(seg.start) + ' — ' + nameOf(seg.speaker);
-    btn.onclick = () => play(seg.start / 1000, seg.end / 1000, row);
+    if (playable) {
+      btn.title = 'Play ' + fmtTime(seg.start) + ' — ' + nameOf(seg.speaker);
+      btn.onclick = () => play(seg.start / 1000, seg.end / 1000, row);
+    } else {
+      btn.style.cursor = 'default';
+      btn.title = nameOf(seg.speaker);
+    }
 
     const rename = document.createElement('button');
     rename.className = 'rename';

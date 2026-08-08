@@ -9,10 +9,16 @@ is static files on GitHub Pages.
 
 | What | Where it goes |
 |---|---|
-| Your audio | Browser → the transcription provider you configured (AssemblyAI). Nowhere else. |
+| Uploaded audio | Browser → the transcription provider you configured (AssemblyAI). Nowhere else. |
+| **Live-caption audio** | **Browser → your browser vendor's speech service.** See the warning below. |
 | Your transcript | Stays in the browser tab. Exports save to your machine. |
 | Your API keys | `localStorage` in your browser. Sent only to that provider's API. |
 | Summary text | Browser → the LLM provider you chose, only when you click **AI Summary**. |
+
+> **Live captions are not private.** The Web Speech API is implemented by the browser, and in
+> Chrome that means your microphone audio is streamed to Google's speech service for
+> recognition. This project has no control over that and receives none of it. **For anything
+> confidential, use Upload mode**, where audio goes only to the provider you chose.
 
 Nothing is stored after you close the tab, apart from your keys and settings in
 `localStorage`. Clear them by clearing site data.
