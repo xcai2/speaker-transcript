@@ -3,7 +3,8 @@ import {
   fmtTime, talkTime,
 } from './transcript.js';
 import { PROVIDERS, summarize, buildPrompt, estimateTokens } from './llm.js';
-import { LiveSession, isSupported as liveSupported, LANGS } from './live.js';
+import { LiveSession, isSupported as liveSupported, secureOrigin, browserNote, LANGS } from './live.js';
+import { t, setLang, getLang, detectLang, apply as applyI18n } from './i18n.js';
 
 const API = 'https://api.assemblyai.com/v2';
 const $ = id => document.getElementById(id);
@@ -14,24 +15,70 @@ let names = {};             // speaker label -> display name
 let rows = [];              // { el, seg } for search/highlight
 let baseName = 'transcript';
 let stopAt = null, playingEl = null;
+let live = null;            // active live-caption session, if any
 
 const audio = $('audio'), list = $('list'), statusEl = $('status');
 
-/* ---------------- compliance notice ---------------- */
+/* ---------------- language, then the compliance notice ----------------
+   The notice is legal text, so it is shown only once the interface language is settled —
+   a first-time visitor picks a language and reads the notice in it. */
+const langMenu = $('langmenu');
+const LANG_LABEL = { en: 'English', zh: '中文' };
+
+function applyUiLang(lang) {
+  const l = setLang(lang);
+  $('langcur').textContent = LANG_LABEL[l];
+  for (const b of langMenu.querySelectorAll('[data-ui-lang]')) {
+    b.classList.toggle('sel', b.dataset.uiLang === l);
+  }
+  refreshDynamicText();
+}
+
+$('langbtn').onclick = e => {
+  e.stopPropagation();
+  const open = langMenu.classList.toggle('open');
+  $('langbtn').setAttribute('aria-expanded', String(open));
+};
+document.addEventListener('click', () => {
+  langMenu.classList.remove('open');
+  $('langbtn').setAttribute('aria-expanded', 'false');
+});
+for (const b of langMenu.querySelectorAll('[data-ui-lang]')) {
+  b.onclick = () => {
+    applyUiLang(b.dataset.uiLang);
+    langMenu.classList.remove('open');
+    if (!localStorage.getItem('legal_ack')) $('legal').classList.add('show');
+  };
+}
+
+applyUiLang(detectLang());
 if (!localStorage.getItem('legal_ack')) $('legal').classList.add('show');
+
 $('legalok').onclick = () => {
   localStorage.setItem('legal_ack', '1');
   $('legal').classList.remove('show');
 };
 
+/* Re-render anything built in JS rather than marked up with data-i18n.
+   Runs during module init as well as on later switches, so it must not touch state that
+   is still being set up further down — look elements up directly, and no-op when empty. */
+function refreshDynamicText() {
+  const k = $('key');
+  if (k) $('keynote').textContent = k.value.trim() ? t('settings.hasKey') : '';
+  if ($('toggle-label')) syncSettingsToggle();
+  if (segments.length) { drawRows(); drawStats(); applySearch(); }
+  else $('hint').textContent = t('hint.default');
+  if (live) $('livego').textContent = live.wanted ? t('live.stop') : t('live.start');
+}
+
 /* ---------------- settings: transcription key ---------------- */
 const keyInput = $('key');
 keyInput.value = localStorage.getItem('aai_key') || '';
-if (keyInput.value) $('keynote').textContent = 'A key is saved in this browser.';
+if (keyInput.value) $('keynote').textContent = t('settings.hasKey');
 $('savekey').onclick = () => {
   const v = keyInput.value.trim();
-  if (v) { localStorage.setItem('aai_key', v); $('keynote').textContent = 'Key saved in this browser.'; }
-  else { localStorage.removeItem('aai_key'); $('keynote').textContent = 'Key cleared.'; }
+  if (v) { localStorage.setItem('aai_key', v); $('keynote').textContent = t('settings.saved'); }
+  else { localStorage.removeItem('aai_key'); $('keynote').textContent = t('settings.cleared'); }
   refresh();
 };
 keyInput.oninput = refresh;
@@ -71,21 +118,21 @@ $('savellm').onclick = () => {
   localStorage.setItem('llm_model_' + p, modelSel.value);
   const b = baseInput.value.trim();
   if (b) localStorage.setItem('llm_base_' + p, b); else localStorage.removeItem('llm_base_' + p);
-  $('llmnote').textContent = k ? 'Saved in this browser.' : 'Key cleared.';
+  $('llmnote').textContent = k ? t('settings.saved') : t('settings.cleared');
 };
 
 // let the user type a model name that isn't in the list
 $('addmodel').onclick = () => {
-  const m = prompt('Model name:');
+  const m = prompt(t('settings.modelPrompt'));
   if (m) { modelSel.append(new Option(m, m)); modelSel.value = m; }
 };
 
 function syncSettingsToggle() {
   const collapsed = $('setup').classList.contains('collapsed');
-  $('toggle-label').textContent = collapsed ? 'Settings' : 'Hide';
+  $('toggle-label').textContent = collapsed ? t('settings.show') : t('settings.hide');
   $('toggle-settings').setAttribute('aria-expanded', String(!collapsed));
   // amber until a transcription key is set, so the way in is obvious
-  $('toggle-settings').classList.toggle('needskey', !keyInput.value.trim());
+  $('toggle-settings').classList.toggle('needskey', !$('key').value.trim());
 }
 $('toggle-settings').onclick = () => {
   $('setup').classList.toggle('collapsed');
@@ -125,7 +172,7 @@ $('go').onclick = async () => {
   if (!picked || !key) return;
   $('go').disabled = true;
   try {
-    say('Uploading ' + picked.name + '…');
+    say(t('upload.uploading') + ' ' + picked.name + '…');
     const up = await fetch(API + '/upload', {
       method: 'POST', headers: { authorization: key }, body: picked,
     });
@@ -133,7 +180,7 @@ $('go').onclick = async () => {
       + (up.status === 401 ? 'That API key was rejected.' : await up.text()));
     const { upload_url } = await up.json();
 
-    say('Queued for transcription…');
+    say(t('upload.queued'));
     const post = await fetch(API + '/transcript', {
       method: 'POST',
       headers: { authorization: key, 'content-type': 'application/json' },
@@ -150,13 +197,12 @@ $('go').onclick = async () => {
     for (;;) {
       await new Promise(r => setTimeout(r, 4000));
       const res = await fetch(API + '/transcript/' + id, { headers: { authorization: key } });
-      const t = await res.json();
-      if (t.status === 'completed') { render(t); break; }
-      if (t.status === 'error') throw new Error(t.error || 'Transcription failed.');
+      const job = await res.json();
+      if (job.status === 'completed') { render(job); break; }
+      if (job.status === 'error') throw new Error(job.error || 'Transcription failed.');
       const el = Date.now() - started;
-      say('Transcribing… ' + Math.floor(el / 60000) + 'm '
-        + String(Math.floor(el / 1000) % 60).padStart(2, '0') + 's elapsed. '
-        + 'This usually takes 5–10 minutes for a one-hour recording.');
+      say(t('upload.working') + ' ' + Math.floor(el / 60000) + 'm '
+        + String(Math.floor(el / 1000) % 60).padStart(2, '0') + 's ' + t('upload.elapsed'));
     }
   } catch (e) {
     say(e.message || String(e), true);
@@ -166,8 +212,6 @@ $('go').onclick = async () => {
 };
 
 /* ---------------- live captions ---------------- */
-let live = null;
-
 for (const [code, label] of LANGS) $('lang').append(new Option(label, code));
 $('lang').value = localStorage.getItem('live_lang') || 'en-US';
 $('lang').onchange = () => {
@@ -185,7 +229,7 @@ function showMode(mode) {
     $('livego').disabled = true;
     $('livenote').className = 'note err';
     $('livenote').textContent =
-      'Your browser does not support the Web Speech API. Live captions work in Chrome, Edge and Safari; Firefox is not supported.';
+      t('live.unsupported');
   }
 }
 $('tab-upload').onclick = () => showMode('upload');
@@ -193,6 +237,14 @@ $('tab-live').onclick = () => showMode('live');
 
 $('livego').onclick = () => {
   if (live && live.wanted) { stopLive(); return; }
+  // fail early with a useful message rather than a bare 'network' error later
+  if (!secureOrigin()) {
+    $('livenote').className = 'note err';
+    $('livenote').textContent = t('live.insecure');
+    return;
+  }
+  const warn = browserNote();
+  if (warn) { $('livenote').className = 'note err'; $('livenote').textContent = warn; return; }
 
   const liveText = $('livetext');
   liveText.textContent = '';
@@ -202,10 +254,10 @@ $('livego').onclick = () => {
     lang: $('lang').value,
     onFinal: ({ text, at }) => {
       const p = document.createElement('p');
-      const t = document.createElement('span');
-      t.className = 'time';
-      t.textContent = fmtTime(at) + '  ';
-      p.append(t, document.createTextNode(text));
+      const ts = document.createElement('span');
+      ts.className = 'time';
+      ts.textContent = fmtTime(at) + '  ';
+      p.append(ts, document.createTextNode(text));
       liveText.append(p);
       $('livebox').scrollTop = $('livebox').scrollHeight;
     },
@@ -213,8 +265,8 @@ $('livego').onclick = () => {
     onState: state => {
       const running = state === 'running';
       $('livego').classList.toggle('listening', running);
-      $('livego').textContent = running ? 'Stop listening' : '● Start listening';
-      if (running) { $('livenote').className = 'note'; $('livenote').textContent = 'Listening… speak normally.'; }
+      $('livego').textContent = running ? t('live.stop') : t('live.start');
+      if (running) { $('livenote').className = 'note'; $('livenote').textContent = t('live.listening'); }
     },
     onError: msg => { $('livenote').className = 'note err'; $('livenote').textContent = msg; },
   });
@@ -229,22 +281,22 @@ function stopLive() {
   const segs = live.toSegments();
   if (!segs.length) {
     $('livenote').className = 'note';
-    $('livenote').textContent = 'Nothing was captured.';
+    $('livenote').textContent = t('live.nothing');
     return;
   }
   // hand the captured text to the same pipeline the upload path uses
   segments = segs;
-  names = { A: 'Me' };
+  names = { A: t('speaker.me') };
   baseName = 'live-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
   audio.removeAttribute('src');
   $('player').classList.remove('show');
   $('toolbar').classList.add('show');
-  $('hint').textContent = 'Live session captured — search, summarize or export it';
+  $('hint').textContent = t('hint.live');
   drawRows();
   drawStats();
   applySearch();
   $('livenote').className = 'note';
-  $('livenote').textContent = segs.length + ' lines captured. They are now in the transcript below.';
+  $('livenote').textContent = segs.length + ' ' + t('live.captured');
   $('list').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -253,11 +305,11 @@ function speakerClass(s) {
   const c = String(s).toUpperCase().charCodeAt(0);
   return 'spk-' + (c >= 65 && c <= 70 ? String(s).toUpperCase() : 'A');
 }
-const nameOf = spk => names[spk] || 'Speaker ' + spk;
+const nameOf = spk => names[spk] || t('speaker.prefix') + ' ' + spk;
 
-function render(t) {
-  const utterances = t.utterances || [];
-  if (!utterances.length) { say('No speech was detected in that file.', true); return; }
+function render(result) {
+  const utterances = result.utterances || [];
+  if (!utterances.length) { say(t('upload.nospeech'), true); return; }
 
   segments = splitIntoSegments(utterances);
   names = {};
@@ -266,7 +318,7 @@ function render(t) {
   audio.src = URL.createObjectURL(picked);
   $('player').classList.add('show');
   $('toolbar').classList.add('show');
-  $('hint').textContent = 'Click a speaker button to play that segment';
+  $('hint').textContent = t('hint.ready');
   statusEl.className = '';
   $('setup').classList.add('collapsed');
   syncSettingsToggle();
@@ -325,7 +377,7 @@ function drawRows() {
 }
 
 function renameSpeaker(spk) {
-  const next = prompt('Name for ' + nameOf(spk) + ':', names[spk] || '');
+  const next = prompt(t('speaker.renamePrompt') + ' ' + nameOf(spk) + ':', names[spk] || '');
   if (next === null) return;
   const v = next.trim();
   if (v) names[spk] = v; else delete names[spk];
@@ -334,8 +386,16 @@ function renameSpeaker(spk) {
   applySearch();
 }
 
+/* Speaker names with the localized fallback applied, for anything outside app.js —
+   transcript.js and llm.js would otherwise fall back to the English "Speaker A". */
+function resolvedNames() {
+  const out = {};
+  for (const s of segments) out[s.speaker] = nameOf(s.speaker);
+  return out;
+}
+
 function drawStats() {
-  const stats = talkTime(segments, names);
+  const stats = talkTime(segments, resolvedNames());
   const el = $('stats');
   el.textContent = '';
   for (const s of stats) {
@@ -380,7 +440,9 @@ function applySearch() {
       from = at + q.length;
     }
   }
-  $('searchnote').textContent = q ? (hits ? hits + ' matching line' + (hits === 1 ? '' : 's') : 'No matches') : '';
+  $('searchnote').textContent = q
+    ? (hits ? hits + ' ' + t(hits === 1 ? 'toolbar.match' : 'toolbar.matches') : t('toolbar.nomatch'))
+    : '';
 }
 
 /* ---------------- playback ---------------- */
@@ -414,11 +476,11 @@ $('export').onchange = e => {
   e.target.selectedIndex = 0;
   if (!fmt || !segments.length) return;
   const meta = { title: baseName, generated: new Date().toISOString() };
-  if (fmt === 'txt')  download(buildTxt(segments, names), baseName + ' - transcript.txt');
-  if (fmt === 'md')   download(buildMarkdown(segments, names, baseName), baseName + ' - transcript.md', 'text/markdown');
-  if (fmt === 'srt')  download(buildSrt(segments, names), baseName + '.srt', 'application/x-subrip');
-  if (fmt === 'vtt')  download(buildVtt(segments, names), baseName + '.vtt', 'text/vtt');
-  if (fmt === 'json') download(buildJson(segments, names, meta), baseName + '.json', 'application/json');
+  if (fmt === 'txt')  download(buildTxt(segments, resolvedNames()), baseName + ' - transcript.txt');
+  if (fmt === 'md')   download(buildMarkdown(segments, resolvedNames(), baseName), baseName + ' - transcript.md', 'text/markdown');
+  if (fmt === 'srt')  download(buildSrt(segments, resolvedNames()), baseName + '.srt', 'application/x-subrip');
+  if (fmt === 'vtt')  download(buildVtt(segments, resolvedNames()), baseName + '.vtt', 'text/vtt');
+  if (fmt === 'json') download(buildJson(segments, resolvedNames(), meta), baseName + '.json', 'application/json');
   if (fmt === 'summary') {
     const s = $('summary').dataset.md;
     if (s) download(s, baseName + ' - summary.md', 'text/markdown');
@@ -434,14 +496,14 @@ $('summarize').onclick = async () => {
   const apiKey = (localStorage.getItem('llm_key_' + p) || llmKey.value).trim();
   if (!apiKey) {
     $('setup').classList.remove('collapsed');
-    setSummary('', 'Add an API key for ' + PROVIDERS[p].label + ' in Settings first.', true);
+    setSummary('', t('summary.needkey') + ' ' + PROVIDERS[p].label + ' ' + t('summary.needkey2'), true);
     return;
   }
-  const transcript = buildPrompt(segments, names);
+  const transcript = buildPrompt(segments, resolvedNames());
   const box = $('summarybox');
   box.classList.add('show');
-  setSummary('', 'Summarizing with ' + PROVIDERS[p].label + ' · ' + modelSel.value
-    + ' (~' + estimateTokens(transcript).toLocaleString() + ' input tokens)…');
+  setSummary('', t('summary.working') + ' ' + PROVIDERS[p].label + ' · ' + modelSel.value
+    + ' (~' + estimateTokens(transcript).toLocaleString() + ' ' + t('summary.tokens') + ')…');
 
   abortSummary = new AbortController();
   try {
@@ -455,7 +517,7 @@ $('summarize').onclick = async () => {
     });
     setSummary(md, '');
   } catch (e) {
-    if (e.name === 'AbortError') setSummary('', 'Cancelled.');
+    if (e.name === 'AbortError') setSummary('', t('summary.cancelled'));
     else setSummary('', e.message || String(e), true);
   } finally {
     abortSummary = null;
@@ -477,7 +539,7 @@ $('copysummary').onclick = async () => {
   const md = $('summary').dataset.md;
   if (!md) return;
   await navigator.clipboard.writeText(md);
-  $('summarynote').textContent = 'Copied to clipboard.';
+  $('summarynote').textContent = t('summary.copied');
 };
 
 /* Small Markdown renderer — headings, bullets, checkboxes, bold, inline code.

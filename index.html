@@ -3,80 +3,108 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Speaker Transcript — private, speaker-separated transcripts in your browser</title>
-<meta name="description" content="Turn any recording into a speaker-separated, searchable transcript with AI summary. Runs entirely in your browser with your own API key — your audio never touches a server.">
+<title>Timbrio — private, speaker-separated transcripts in your browser</title>
+<meta name="description" content="Turn any recording into a speaker-separated, searchable transcript with AI summaries. Runs entirely in your browser with your own API key — your audio never touches a server.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%237c3aed'/><g fill='white'><rect x='7' y='13' width='2.6' height='6' rx='1.3'/><rect x='12' y='9' width='2.6' height='14' rx='1.3'/><rect x='17.4' y='11' width='2.6' height='10' rx='1.3'/><rect x='22.4' y='14' width='2.6' height='4' rx='1.3'/></g></svg>">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
 <div id="legal"><div class="box">
-  <h2>Record responsibly</h2>
-  <p>Recording laws vary by jurisdiction. Some U.S. states — including California, Illinois,
-     Washington, Pennsylvania and Florida — require <strong>everyone</strong> being recorded to
-     consent. The EU (GDPR) and China (PIPL) impose additional duties.</p>
-  <p>You are responsible for having the right to record and process any audio you use with
-     this tool. See <a href="https://github.com/xcai2/speaker-transcript/blob/main/LEGAL.md" target="_blank" rel="noopener">LEGAL.md</a> for details.</p>
-  <button class="bar primary" id="legalok">I understand</button>
+  <div class="icon">⚖️</div>
+  <h2 data-i18n="legal.title">Record responsibly</h2>
+  <p data-i18n="legal.p1">Recording laws vary by jurisdiction. Some U.S. states — including California,
+     Illinois, Washington, Pennsylvania and Florida — require <strong>everyone</strong> being
+     recorded to consent. The EU (GDPR) and China (PIPL) impose additional duties.</p>
+  <p data-i18n="legal.p2">You are responsible for having the right to record and process any audio you
+     use with this tool.</p>
+  <button class="bar primary" id="legalok" data-i18n="legal.ok">I understand</button>
 </div></div>
 
 <header>
-  <h1>Speaker Transcript</h1>
-  <span class="hint" id="hint">Upload a recording to get a speaker-separated transcript</span>
-  <a class="gh" href="https://github.com/xcai2/speaker-transcript" target="_blank" rel="noopener">GitHub</a>
+  <a class="brand" href="./">
+    <span class="mark" aria-hidden="true">
+      <svg viewBox="0 0 32 32"><g fill="#fff">
+        <rect x="7" y="13" width="2.6" height="6" rx="1.3"/>
+        <rect x="12" y="9" width="2.6" height="14" rx="1.3"/>
+        <rect x="17.4" y="11" width="2.6" height="10" rx="1.3"/>
+        <rect x="22.4" y="14" width="2.6" height="4" rx="1.3"/>
+      </g></svg>
+    </span>
+    <span>
+      <h1>Timbrio</h1>
+      <div class="tag" data-i18n="brand.tag">Hear who's speaking</div>
+    </span>
+  </a>
+
+  <span class="hint" id="hint" data-i18n="hint.default">Upload a recording to get a speaker-separated transcript</span>
+
+  <div class="menu" id="langmenu">
+    <button id="langbtn" aria-haspopup="true" aria-expanded="false">
+      <span>🌐</span><span id="langcur">English</span><span style="font-size:9px">▼</span>
+    </button>
+    <div class="list" role="menu">
+      <button data-ui-lang="en" role="menuitem">🇬🇧 English</button>
+      <button data-ui-lang="zh" role="menuitem">🇨🇳 中文</button>
+    </div>
+  </div>
+
+  <a class="gh" href="https://github.com/xcai2/timbrio" target="_blank" rel="noopener">
+    <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    <span>GitHub</span>
+  </a>
 </header>
 
 <main>
   <div class="panel" id="setup">
     <h2>
-      Settings
+      <span data-i18n="settings.title">Settings</span>
       <button id="toggle-settings" aria-expanded="true" aria-controls="setup-body">
-        <span class="chev">▼</span><span id="toggle-label">Hide</span>
+        <span class="chev">▼</span><span id="toggle-label" data-i18n="settings.hide">Hide</span>
       </button>
     </h2>
     <div class="collapsible" id="setup-body">
-      <p class="sub">
+      <p class="sub" data-i18n="settings.sub">
         Everything runs in your browser using <strong>your own</strong> API keys. Keys are stored
         only in this browser's local storage and are sent directly to the provider you choose —
         they never reach any server of mine, and neither does your audio.
       </p>
 
-      <label class="field" for="key">Transcription — AssemblyAI API key</label>
+      <label class="field" for="key" data-i18n="settings.aaiLabel">Transcription — AssemblyAI API key</label>
       <div class="row-2">
         <div>
-          <input type="password" id="key" placeholder="Paste your AssemblyAI key" autocomplete="off" spellcheck="false">
+          <input type="password" id="key" data-i18n-ph="settings.aaiPh" placeholder="Paste your AssemblyAI key" autocomplete="off" spellcheck="false">
         </div>
-        <button class="bar" id="savekey">Save</button>
+        <button class="bar" id="savekey" data-i18n="settings.save">Save</button>
       </div>
       <div class="note">
-        Required. Get a free key at
+        <span data-i18n="settings.aaiNote">Required. Get a free key at</span>
         <a href="https://www.assemblyai.com/dashboard/signup" target="_blank" rel="noopener">assemblyai.com</a>
-        — around $0.15–0.27 per hour of audio.
+        <span data-i18n="settings.aaiCost">— around $0.15–0.27 per hour of audio.</span>
         <span id="keynote"></span>
       </div>
 
       <div class="sep"></div>
 
-      <label class="field" for="provider">AI summary — model provider</label>
+      <label class="field" for="provider" data-i18n="settings.llmLabel">AI summary — model provider</label>
       <div class="row-2">
         <div><select id="provider"></select></div>
-        <div>
-          <select id="model"></select>
-        </div>
-        <button class="bar" id="addmodel" title="Enter a model name manually">+ Model</button>
+        <div><select id="model"></select></div>
+        <button class="bar" id="addmodel" data-i18n="settings.addModel">+ Model</button>
       </div>
       <div class="row-2" style="margin-top:10px">
         <div>
-          <input type="password" id="llmkey" placeholder="Paste your model provider key" autocomplete="off" spellcheck="false">
+          <input type="password" id="llmkey" data-i18n-ph="settings.llmPh" placeholder="Paste your model provider key" autocomplete="off" spellcheck="false">
         </div>
-        <button class="bar" id="savellm">Save</button>
+        <button class="bar" id="savellm" data-i18n="settings.save">Save</button>
       </div>
       <div id="customwrap" style="margin-top:10px; display:none">
-        <label class="field" for="baseurl">Base URL</label>
+        <label class="field" for="baseurl" data-i18n="settings.baseUrl">Base URL</label>
         <input type="text" id="baseurl" placeholder="https://your-endpoint/v1" autocomplete="off" spellcheck="false">
       </div>
       <div class="note">
-        Optional — only needed for summaries.
-        <a id="getkey" href="#" target="_blank" rel="noopener">Get a key</a>
+        <span data-i18n="settings.llmNote">Optional — only needed for summaries.</span>
+        <a id="getkey" href="#" target="_blank" rel="noopener" data-i18n="settings.getKey">Get a key</a>
         <span id="provnote"></span>
         <span id="llmnote"></span>
       </div>
@@ -84,41 +112,41 @@
   </div>
 
   <div class="tabs">
-    <button class="tab active" id="tab-upload">📁 Upload a recording</button>
-    <button class="tab" id="tab-live">🎙 Live captions</button>
+    <button class="tab active" id="tab-upload" data-i18n="tab.upload">📁 Upload a recording</button>
+    <button class="tab" id="tab-live" data-i18n="tab.live">🎙 Live captions</button>
   </div>
 
   <div class="panel" id="pane-upload">
-    <h2>Upload a recording</h2>
-    <p class="sub">Audio or video — m4a, mp3, wav, mp4 and more. A one-hour file takes roughly
-      5–10 minutes, and gives you <strong>speaker separation</strong>.</p>
+    <h2 data-i18n="upload.title">Upload a recording</h2>
+    <p class="sub" data-i18n="upload.sub">Audio or video — m4a, mp3, wav, mp4 and more. A one-hour file
+      takes roughly 5–10 minutes, and gives you <strong>speaker separation</strong>.</p>
     <div id="drop">
-      <div class="big">Drop a file here, or click to choose</div>
-      <div class="small" id="fname">No file selected</div>
+      <div class="big" data-i18n="upload.drop">Drop a file here, or click to choose</div>
+      <div class="small" id="fname" data-i18n="upload.none">No file selected</div>
     </div>
     <input type="file" id="file" accept="audio/*,video/*">
-    <div class="row-2" style="margin-top:14px">
-      <button class="bar primary" id="go" disabled>Transcribe</button>
+    <div class="row-2" style="margin-top:16px">
+      <button class="bar primary" id="go" disabled data-i18n="upload.go">Transcribe</button>
     </div>
     <div id="status"></div>
   </div>
 
   <div class="panel" id="pane-live" style="display:none">
-    <h2>Live captions</h2>
-    <p class="sub">Transcribes from your microphone as you speak, using your browser's built-in
-      speech engine — <strong>free, no API key</strong>. When you stop, the text becomes a normal
-      transcript you can search, summarize and export.
-      <br>No speaker separation in this mode — use Upload for that. Note that browsers implement
-      this by sending audio to their own speech service (Google's, in Chrome), so for
-      confidential material use Upload mode instead.</p>
+    <h2 data-i18n="live.title">Live captions</h2>
+    <p class="sub" data-i18n="live.sub">Transcribes from your microphone as you speak, using your
+      browser's built-in speech engine — <strong>free, no API key</strong>. When you stop, the text
+      becomes a normal transcript you can search, summarize and export.
+      <br>No speaker separation in this mode — use Upload for that. Note that browsers implement this
+      by sending audio to their own speech service (Google's, in Chrome), so for confidential
+      material use Upload mode instead.</p>
     <div class="row-2">
       <div>
-        <label class="field" for="lang">Language</label>
+        <label class="field" for="lang" data-i18n="live.lang">Speech language</label>
         <select id="lang"></select>
       </div>
-      <button class="bar primary" id="livego">● Start listening</button>
+      <button class="bar primary" id="livego" data-i18n="live.start">● Start listening</button>
     </div>
-    <div id="livebox">
+    <div id="livebox" data-empty="Captions will appear here…">
       <div id="livetext"></div>
       <span id="interim"></span>
     </div>
@@ -127,26 +155,26 @@
 
   <div id="toolbar">
     <div id="searchwrap">
-      <input type="text" id="search" placeholder="Search the transcript…" autocomplete="off">
+      <input type="text" id="search" data-i18n-ph="toolbar.search" placeholder="Search the transcript…" autocomplete="off">
       <button id="clearsearch" title="Clear">×</button>
     </div>
     <span id="searchnote"></span>
-    <button class="bar" id="summarize">✨ AI Summary</button>
+    <button class="bar" id="summarize" data-i18n="toolbar.summary">✨ AI Summary</button>
     <select id="export" title="Export">
-      <option value="">Export…</option>
+      <option value="" data-i18n="toolbar.export">Export…</option>
       <option value="txt">Plain text (.txt)</option>
       <option value="md">Markdown (.md)</option>
       <option value="srt">Subtitles (.srt)</option>
       <option value="vtt">Subtitles (.vtt)</option>
       <option value="json">JSON (.json)</option>
-      <option value="summary">Summary (.md)</option>
+      <option value="summary" data-i18n="toolbar.exportSummary">Summary (.md)</option>
     </select>
   </div>
 
   <div class="panel" id="summarybox">
     <h2>
-      ✨ AI notes
-      <button class="toggle bar" id="copysummary" style="display:none">Copy</button>
+      <span data-i18n="summary.title">✨ AI notes</span>
+      <button class="bar" id="copysummary" style="display:none; margin-left:auto" data-i18n="summary.copy">Copy</button>
     </h2>
     <div id="summary"></div>
     <div class="note" id="summarynote"></div>

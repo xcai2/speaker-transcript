@@ -1,4 +1,6 @@
-# Speaker Transcript
+# Timbrio
+
+*Hear who's speaking.*
 
 **The transcript tool for recordings you can't upload to a cloud service.**
 
@@ -13,7 +15,7 @@ because there is no server.
 
 ![The transcript page](docs/screenshot.png)
 
-**[▶ Try it](https://xcai2.github.io/speaker-transcript/)** · no signup, no account, no upload to me
+**[▶ Try it](https://xcai2.github.io/timbrio/)** · no signup, no account, no upload to me
 
 ---
 
@@ -44,13 +46,13 @@ under NDA — cloud transcription is usually off the table. That's the gap this 
 - **AI summary** — abstract, key points, and action items with owners and timestamps
 - **Talk-time breakdown** — who actually dominated the meeting
 - **Export** — `.txt`, `.md`, `.srt`, `.vtt`, `.json`
-- **Bilingual** — proper Chinese segmentation, not one space between every character
+- **Bilingual** — proper Chinese segmentation, and an English / 中文 interface
 
 ## Two ways to use it
 
 ### The web page — nothing to install
 
-Open the [demo](https://xcai2.github.io/speaker-transcript/) and pick a mode:
+Open the [demo](https://xcai2.github.io/timbrio/) and pick a mode:
 
 **📁 Upload a recording** — paste your AssemblyAI key into Settings, then drop in a file.
 Gives you speaker separation and the highest accuracy.
@@ -68,8 +70,8 @@ Optionally add a model provider key for AI summaries in either mode.
 Writes a self-contained `<name> - transcript.html` next to your audio.
 
 ```bash
-git clone https://github.com/xcai2/speaker-transcript.git
-cd speaker-transcript
+git clone https://github.com/xcai2/timbrio.git
+cd timbrio
 
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
@@ -121,6 +123,7 @@ responsible for having the right to record and process any audio you use here.
 | `index.html` | The web app |
 | `app.js` | Upload, transcription, rendering, search, summary |
 | `live.js` | Live captions via the Web Speech API |
+| `i18n.js` | English / 中文 interface strings |
 | `transcript.js` | Sentence splitting and every export format |
 | `llm.js` | Model provider clients |
 | `transcribe.py` | The CLI version |

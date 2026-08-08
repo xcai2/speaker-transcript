@@ -12,6 +12,21 @@ export function isSupported() {
   return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 }
 
+/* The engine needs a secure origin. Opened from disk as file:// it fails with a bare
+   'network' error that explains nothing, so detect that case before starting. */
+export function secureOrigin() {
+  return window.isSecureContext
+      || location.protocol === 'https:'
+      || ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+}
+
+/* Chrome routes recognition through Google's servers; Firefox has no implementation. */
+export function browserNote() {
+  const ua = navigator.userAgent;
+  if (/Firefox\//.test(ua)) return 'Firefox does not implement the Web Speech API. Use Chrome, Edge or Safari for live captions.';
+  return '';
+}
+
 export const LANGS = [
   ['en-US', 'English (US)'],
   ['en-GB', 'English (UK)'],
@@ -69,7 +84,16 @@ export class LiveSession {
         if (this.running) { this.running = false; this.onState?.('stopped'); }
         return;
       }
-      if (e.error === 'network') { this.onError?.('Network error — speech recognition needs a connection.'); return; }
+      if (e.error === 'network') {
+        this.wanted = false;
+        try { this.rec.abort(); } catch { /* not running */ }
+        this.onError?.(secureOrigin()
+          ? 'The speech service could not be reached. Check your connection — the browser engine needs one — and note that some networks block it.'
+          : 'Live captions need a secure origin. This page is running from ' + location.protocol
+            + '// — open it over https (the hosted demo) or from http://localhost instead.');
+        if (this.running) { this.running = false; this.onState?.('stopped'); }
+        return;
+      }
       this.onError?.('Recognition error: ' + e.error);
     };
 

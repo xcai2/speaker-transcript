@@ -118,23 +118,35 @@ export async function summarize({ provider, apiKey, model, baseUrl, transcript, 
 }
 
 async function callOpenAICompatible({ base, apiKey, model, transcript, signal }) {
-  const res = await fetch(base + '/chat/completions', {
+  const messages = [
+    { role: 'system', content: SYSTEM },
+    { role: 'user', content: 'Transcript:\n\n' + transcript },
+  ];
+  const post = body => fetch(base + '/chat/completions', {
     method: 'POST',
     signal,
     headers: { 'content-type': 'application/json', authorization: 'Bearer ' + apiKey },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: SYSTEM },
-        { role: 'user', content: 'Transcript:\n\n' + transcript },
-      ],
-      temperature: 0.2,
-    }),
+    body: JSON.stringify(body),
   });
+
+  // A low temperature suits summarization, but reasoning models (GPT-5 and friends) reject
+  // any value but their default. It's a nice-to-have, so drop it and retry rather than fail.
+  let res = await post({ model, messages, temperature: 0.2 });
+  if (!res.ok && res.status === 400) {
+    const msg = await res.clone().text().catch(() => '');
+    if (/temperature/i.test(msg)) res = await post({ model, messages });
+  }
+
   if (!res.ok) throw new Error(await describeError(res));
   const data = await res.json();
   const text = data.choices?.[0]?.message?.content;
-  if (!text) throw new Error('The model returned an empty response.');
+  if (!text) {
+    // reasoning models can spend the whole budget on reasoning and return no visible text
+    const reason = data.choices?.[0]?.finish_reason;
+    throw new Error(reason === 'length'
+      ? 'The model hit its output limit before writing a summary. Try a shorter recording or another model.'
+      : 'The model returned an empty response.');
+  }
   return text;
 }
 
