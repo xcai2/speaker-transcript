@@ -1,0 +1,19 @@
+# Secrets — never commit
+.env
+
+# Recordings and their transcripts stay local
+*.m4a
+*.mp3
+*.wav
+*.mp4
+*.mov
+*.txt
+*- transcript.html
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store

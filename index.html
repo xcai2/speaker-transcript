@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Speaker Transcript — turn any recording into a speaker-separated transcript</title>
+<style>
+  :root {
+    --a: #2563eb; --b: #db2777; --c: #059669; --d: #d97706;
+    --bg: #f6f7f9; --fg: #1a1a1a; --card: #fff; --line: #e5e7eb;
+    --muted: #6b7280; --faint: #9ca3af; --hover: #eef1f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115; --fg: #e8eaed; --card: #171a21; --line: #2a2f3a;
+      --muted: #9aa3b2; --faint: #6b7280; --hover: #1e222b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         margin: 0; background: var(--bg); color: var(--fg); }
+
+  header { position: sticky; top: 0; background: var(--card); border-bottom: 1px solid var(--line);
+           padding: 14px 20px; display: flex; align-items: center; gap: 16px; z-index: 10; }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  header .hint { font-size: 13px; color: var(--muted); margin-left: auto; }
+  header a.gh { font-size: 13px; color: var(--muted); text-decoration: none; }
+  header a.gh:hover { color: var(--fg); }
+
+  .bar { flex: none; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+         border: 1px solid var(--line); background: var(--card); color: var(--fg);
+         border-radius: 8px; padding: 7px 12px; font-size: 13px; font-weight: 600; }
+  .bar:hover { background: var(--hover); }
+  .bar:disabled { opacity: .5; cursor: not-allowed; }
+  .bar svg { width: 14px; height: 14px; fill: currentColor; }
+
+  main { max-width: 820px; margin: 0 auto; padding: 24px 16px 140px; }
+
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+           padding: 20px; margin-bottom: 20px; }
+  .panel h2 { font-size: 15px; margin: 0 0 4px; font-weight: 600; }
+  .panel p.sub { font-size: 13px; color: var(--muted); margin: 0 0 16px; line-height: 1.6; }
+  .panel p.sub a { color: var(--a); }
+
+  label.field { display: block; font-size: 13px; font-weight: 600; margin: 0 0 6px; }
+  input[type=password], input[type=text] {
+    width: 100%; padding: 9px 11px; font-size: 14px; font-family: inherit;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); }
+  .row-2 { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .row-2 > div:first-child { flex: 1; min-width: 240px; }
+  .note { font-size: 12px; color: var(--faint); margin-top: 6px; line-height: 1.5; }
+
+  #drop { border: 2px dashed var(--line); border-radius: 12px; padding: 28px 20px;
+          text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+  #drop:hover, #drop.over { border-color: var(--a); background: var(--hover); }
+  #drop .big { font-size: 14px; font-weight: 600; }
+  #drop .small { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  #file { display: none; }
+
+  #status { display: none; font-size: 13px; margin-top: 14px; padding: 11px 13px;
+            border-radius: 8px; background: var(--hover); color: var(--muted); line-height: 1.5; }
+  #status.err { background: #fef2f2; color: #b91c1c; }
+  @media (prefers-color-scheme: dark) { #status.err { background: #2a1416; color: #fca5a5; } }
+  #status.show { display: block; }
+
+  .row { display: flex; gap: 12px; padding: 10px 12px; border-radius: 10px;
+         align-items: flex-start; transition: background .15s; }
+  .row:hover { background: var(--hover); }
+  .row.playing { background: #fff7ed; box-shadow: inset 0 0 0 1px #fed7aa; }
+  @media (prefers-color-scheme: dark) { .row.playing { background: #2a2013; box-shadow: inset 0 0 0 1px #7c5a1e; } }
+  .btn { flex: none; display: flex; align-items: center; gap: 6px; cursor: pointer;
+         border: none; border-radius: 999px; padding: 5px 12px 5px 9px; font-size: 13px;
+         font-weight: 600; color: #fff; user-select: none; }
+  .btn svg { width: 13px; height: 13px; fill: currentColor; }
+  .spk-A { background: var(--a); } .spk-B { background: var(--b); }
+  .spk-C { background: var(--c); } .spk-D { background: var(--d); }
+  .spk-E { background: #7c3aed; } .spk-F { background: #0891b2; }
+  .body { flex: 1; }
+  .text { font-size: 15px; line-height: 1.7; }
+  .time { font-size: 11px; color: var(--faint); margin-top: 3px; font-variant-numeric: tabular-nums; }
+
+  footer { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card);
+           border-top: 1px solid var(--line); padding: 10px 16px; display: none; }
+  footer.show { display: block; }
+  footer .inner { max-width: 820px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+  audio { width: 100%; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Speaker Transcript</h1>
+  <span class="hint" id="hint">Upload a recording to get a speaker-separated transcript</span>
+  <a class="gh" href="https://github.com/xcai2" target="_blank" rel="noopener">GitHub</a>
+  <button class="bar" id="download" style="display:none">
+    <svg viewBox="0 0 24 24"><path d="M12 16l-6-6h4V4h4v6h4l-6 6zm-8 4v-2h16v2H4z"/></svg>
+    Download txt
+  </button>
+</header>
+
+<main>
+  <div class="panel" id="setup">
+    <h2>Settings</h2>
+    <p class="sub">
+      This page runs entirely in your browser and uses <strong>your own</strong> AssemblyAI API key.
+      Get a free one at <a href="https://www.assemblyai.com/dashboard/signup" target="_blank" rel="noopener">assemblyai.com</a>.
+      Your key is stored only in this browser's local storage and is sent directly to AssemblyAI —
+      it never reaches any server of mine, and neither does your audio.
+    </p>
+    <div class="row-2">
+      <div>
+        <label class="field" for="key">AssemblyAI API key</label>
+        <input type="password" id="key" placeholder="Paste your API key" autocomplete="off" spellcheck="false">
+      </div>
+      <button class="bar" id="savekey">Save key</button>
+    </div>
+    <div class="note" id="keynote"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Upload a recording</h2>
+    <p class="sub">Audio or video — m4a, mp3, wav, mp4 and more. A one-hour file takes roughly 5–10 minutes.</p>
+    <div id="drop">
+      <div class="big">Drop a file here, or click to choose</div>
+      <div class="small" id="fname">No file selected</div>
+    </div>
+    <input type="file" id="file" accept="audio/*,video/*">
+    <div class="row-2" style="margin-top:14px">
+      <button class="bar" id="go" disabled>Transcribe</button>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <div id="list"></div>
+</main>
+
+<footer id="player"><div class="inner">
+  <audio id="audio" controls preload="metadata"></audio>
+</div></footer>
+
+<script>
+const API = 'https://api.assemblyai.com/v2';
+const $ = id => document.getElementById(id);
+const keyInput = $('key'), fileInput = $('file'), drop = $('drop');
+const statusEl = $('status'), list = $('list'), audio = $('audio');
+let picked = null, TXT = '', TXT_NAME = 'transcript.txt';
+let stopAt = null, playingEl = null;
+
+/* ---------- API key, kept in this browser only ---------- */
+const saved = localStorage.getItem('aai_key') || '';
+if (saved) { keyInput.value = saved; $('keynote').textContent = 'A key is saved in this browser.'; }
+$('savekey').onclick = () => {
+  const v = keyInput.value.trim();
+  if (v) { localStorage.setItem('aai_key', v); $('keynote').textContent = 'Key saved in this browser.'; }
+  else { localStorage.removeItem('aai_key'); $('keynote').textContent = 'Key cleared.'; }
+  refresh();
+};
+
+/* ---------- file picking ---------- */
+drop.onclick = () => fileInput.click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => {
+  e.preventDefault(); drop.classList.remove('over');
+  if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+};
+fileInput.onchange = () => { if (fileInput.files[0]) setFile(fileInput.files[0]); };
+function setFile(f) {
+  picked = f;
+  $('fname').textContent = f.name + '  (' + (f.size / 1048576).toFixed(1) + ' MB)';
+  refresh();
+}
+function refresh() { $('go').disabled = !(picked && keyInput.value.trim()); }
+keyInput.oninput = refresh;
+
+function say(msg, isErr) {
+  statusEl.textContent = msg;
+  statusEl.className = 'show' + (isErr ? ' err' : '');
+}
+
+/* ---------- transcribe ---------- */
+$('go').onclick = async () => {
+  const key = keyInput.value.trim();
+  if (!picked || !key) return;
+  $('go').disabled = true;
+  try {
+    say('Uploading ' + picked.name + '…');
+    const up = await fetch(API + '/upload', {
+      method: 'POST', headers: { authorization: key }, body: picked
+    });
+    if (!up.ok) throw new Error('Upload failed (' + up.status + '). ' +
+      (up.status === 401 ? 'That API key was rejected.' : await up.text()));
+    const { upload_url } = await up.json();
+
+    say('Queued for transcription…');
+    const post = await fetch(API + '/transcript', {
+      method: 'POST',
+      headers: { authorization: key, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        audio_url: upload_url,
+        speaker_labels: true,
+        speech_models: ['universal-3-pro', 'universal-2'],
+      })
+    });
+    if (!post.ok) throw new Error('Could not start transcription. ' + await post.text());
+    const { id } = await post.json();
+
+    const started = Date.now();
+    while (true) {
+      await new Promise(r => setTimeout(r, 4000));
+      const res = await fetch(API + '/transcript/' + id, { headers: { authorization: key } });
+      const t = await res.json();
+      if (t.status === 'completed') { render(t); break; }
+      if (t.status === 'error') throw new Error(t.error || 'Transcription failed.');
+      const mins = Math.floor((Date.now() - started) / 60000),
+            secs = Math.floor((Date.now() - started) / 1000) % 60;
+      say('Transcribing… ' + mins + 'm ' + String(secs).padStart(2, '0') + 's elapsed. '
+          + 'This usually takes 5–10 minutes for a one-hour recording.');
+    }
+  } catch (e) {
+    say(e.message || String(e), true);
+  } finally {
+    $('go').disabled = false;
+  }
+};
+
+/* ---------- the same shaping the Python script does ---------- */
+const SENTENCE_END = '。！？…!?';
+const PAUSE_MS = 800;
+const CJK = /[一-鿿]/;
+
+// AssemblyAI treats each Chinese character as its own word; drop spaces between them.
+function fixSpaces(s) {
+  s = s.replace(/([一-鿿])\s+(?=[一-鿿，。！？；：、""''）】])/g, '$1');
+  s = s.replace(/([（【])\s+(?=[一-鿿])/g, '$1');
+  return s.trim();
+}
+function fmtTime(ms) {
+  const s = Math.floor(ms / 1000);
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+}
+
+// Split each speaker's turn into sentences on punctuation/pauses, keeping timestamps.
+function splitIntoSegments(utterances) {
+  const out = [];
+  for (const utt of utterances) {
+    const words = utt.words || [];
+    if (!words.length) {
+      out.push({ speaker: utt.speaker, start: utt.start, end: utt.end, text: fixSpaces(utt.text) });
+      continue;
+    }
+    let buf = [];
+    words.forEach((w, i) => {
+      buf.push(w);
+      const trimmed = (w.text || '').trim();
+      const last = trimmed.slice(-1);
+      const gap = i + 1 < words.length ? words[i + 1].start - w.end : 0;
+      if (SENTENCE_END.includes(last) || gap > PAUSE_MS || i === words.length - 1) {
+        const text = fixSpaces(buf.map(x => x.text).join(' '));
+        if (text) out.push({ speaker: utt.speaker, start: buf[0].start, end: buf[buf.length - 1].end, text });
+        buf = [];
+      }
+    });
+  }
+  return out;
+}
+
+// Plain text grouped by speaker, for the Download button.
+function buildTxt(utterances) {
+  const lines = []; let curSpk = null, cur = [];
+  for (const utt of utterances) {
+    const spk = 'Speaker ' + utt.speaker;
+    if (spk !== curSpk) {
+      if (cur.length) lines.push(curSpk + ': ' + fixSpaces(cur.join(' ')));
+      curSpk = spk; cur = [utt.text];
+    } else cur.push(utt.text);
+  }
+  if (cur.length) lines.push(curSpk + ': ' + fixSpaces(cur.join(' ')));
+  return lines.join('\n\n');
+}
+
+function speakerClass(s) {
+  const c = String(s).toUpperCase().charCodeAt(0);
+  return 'spk-' + (c >= 65 && c <= 70 ? String(s).toUpperCase() : 'A');
+}
+
+function render(t) {
+  const utterances = t.utterances || [];
+  if (!utterances.length) { say('No speech was detected in that file.', true); return; }
+  const segments = splitIntoSegments(utterances);
+  TXT = buildTxt(utterances);
+  TXT_NAME = picked.name.replace(/\.[^.]+$/, '') + ' - transcript.txt';
+
+  audio.src = URL.createObjectURL(picked);
+  $('player').classList.add('show');
+  $('download').style.display = 'inline-flex';
+  $('hint').textContent = 'Click a speaker button to play that segment';
+  statusEl.className = '';
+
+  list.textContent = '';
+  for (const seg of segments) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    const btn = document.createElement('button');
+    btn.className = 'btn ' + speakerClass(seg.speaker);
+    btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+    btn.append(document.createTextNode(seg.speaker));
+    btn.onclick = () => play(seg.start / 1000, seg.end / 1000, row);
+    const body = document.createElement('div');
+    body.className = 'body';
+    const text = document.createElement('div');
+    text.className = 'text';
+    text.textContent = seg.text;
+    const time = document.createElement('div');
+    time.className = 'time';
+    time.textContent = fmtTime(seg.start);
+    body.append(text, time);
+    row.append(btn, body);
+    list.append(row);
+  }
+  list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ---------- playback ---------- */
+function play(start, end, el) {
+  if (playingEl) playingEl.classList.remove('playing');
+  el.classList.add('playing');
+  playingEl = el; stopAt = end;
+  audio.currentTime = start;
+  audio.play();
+}
+audio.addEventListener('timeupdate', () => {
+  if (stopAt !== null && audio.currentTime >= stopAt) {
+    audio.pause(); stopAt = null;
+    if (playingEl) { playingEl.classList.remove('playing'); playingEl = null; }
+  }
+});
+audio.addEventListener('pause', () => { stopAt = null; });
+
+$('download').onclick = () => {
+  const blob = new Blob([TXT], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = TXT_NAME;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+};
+</script>
+</body>
+</html>
