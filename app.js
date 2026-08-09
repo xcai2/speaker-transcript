@@ -26,7 +26,8 @@ const audio = $('audio'), list = $('list'), statusEl = $('status');
    The notice is legal text, so it is shown only once the interface language is settled —
    a first-time visitor picks a language and reads the notice in it. */
 const langMenu = $('langmenu');
-const LANG_LABEL = { en: 'English', zh: '中文' };
+const LANG_LABEL = { en: 'English', zh: '中文', ja: '日本語', ko: '한국어',
+                     es: 'Español', fr: 'Français', de: 'Deutsch' };
 
 function applyUiLang(lang) {
   const l = setLang(lang);
@@ -305,6 +306,7 @@ $('livego').onclick = async () => {
       p.textContent = txt;
       $('livetext').append(p);
       $('interim').textContent = '';
+      if ($('clearlive')) $('clearlive').style.display = 'inline-flex';
       $('livebox').scrollTop = $('livebox').scrollHeight;
     },
     onState: st => {
@@ -366,6 +368,57 @@ function offerDownload(file) {
     URL.revokeObjectURL(url);
   };
   $('pane-live').append(b);
+}
+
+/* ---------------- clear ----------------
+   Wipes the current transcript and everything derived from it, returning the page to its
+   initial state. Only in-memory state and the object URL are touched — saved API keys and
+   the language choice are settings, not results, so they stay. */
+function onClear() {
+  const hasSomething = segments.length || $('livetext').textContent.trim();
+  if (hasSomething && !confirm(t('toolbar.clearConfirm'))) return;
+  clearTranscript();
+}
+$('clearall').onclick = onClear;
+if ($('clearlive')) $('clearlive').onclick = onClear;
+
+function clearTranscript() {
+  segments = []; names = {}; rows = [];
+  baseName = 'transcript';
+  picked = null;
+  stopAt = null; playingEl = null;
+
+  list.textContent = '';
+  $('stats').textContent = '';
+  $('toolbar').classList.remove('show');
+  $('search').value = '';
+  $('searchnote').textContent = '';
+
+  setSummary('', '');
+  $('summarybox').classList.remove('show');
+
+  // release the recording's object URL rather than leaking it
+  if (audio.src) { try { URL.revokeObjectURL(audio.src); } catch { /* not an object URL */ } }
+  audio.pause();
+  audio.removeAttribute('src');
+  audio.load();
+  $('player').classList.remove('show');
+
+  // reset both input modes
+  $('fname').textContent = t('upload.none');
+  fileInput.value = '';
+  statusEl.className = '';
+  statusEl.textContent = '';
+  $('livetext').textContent = '';
+  $('interim').textContent = '';
+  $('livenote').className = 'note';
+  $('livenote').textContent = '';
+  $('rectime').textContent = '00:00';
+  if ($('clearlive')) $('clearlive').style.display = 'none';
+  $('saverec')?.remove();
+
+  $('hint').textContent = t('hint.default');
+  refresh();
 }
 
 /* ---------------- render ---------------- */

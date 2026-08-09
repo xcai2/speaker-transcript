@@ -46,6 +46,11 @@
     <div class="list" role="menu">
       <button data-ui-lang="en" role="menuitem">🇬🇧 English</button>
       <button data-ui-lang="zh" role="menuitem">🇨🇳 中文</button>
+      <button data-ui-lang="ja" role="menuitem">🇯🇵 日本語</button>
+      <button data-ui-lang="ko" role="menuitem">🇰🇷 한국어</button>
+      <button data-ui-lang="es" role="menuitem">🇪🇸 Español</button>
+      <button data-ui-lang="fr" role="menuitem">🇫🇷 Français</button>
+      <button data-ui-lang="de" role="menuitem">🇩🇪 Deutsch</button>
     </div>
   </div>
 
@@ -154,6 +159,7 @@
       <span id="interim"></span>
     </div>
     <div class="note" id="livenote"></div>
+    <button class="bar" id="clearlive" data-i18n="toolbar.clear" style="display:none; margin-top:12px">🗑 Clear</button>
   </div>
 
   <div id="toolbar">
@@ -172,6 +178,7 @@
       <option value="json">JSON (.json)</option>
       <option value="summary" data-i18n="toolbar.exportSummary">Summary (.md)</option>
     </select>
+    <button class="bar" id="clearall" data-i18n="toolbar.clear">🗑 Clear</button>
   </div>
 
   <div class="panel" id="summarybox">

@@ -46,7 +46,9 @@ under NDA — cloud transcription is usually off the table. That's the gap this 
 - **AI summary** — abstract, key points, and action items with owners and timestamps
 - **Talk-time breakdown** — who actually dominated the meeting
 - **Export** — `.txt`, `.md`, `.srt`, `.vtt`, `.json`
-- **Bilingual** — proper Chinese segmentation, and an English / 中文 interface
+- **Clear** — discard the current transcript and start over, from either mode
+- **7 interface languages** — English, 中文, 日本語, 한국어, Español, Français, Deutsch
+- **Bilingual transcripts** — proper Chinese segmentation, not one space per character
 
 ## Two ways to use it
 
