@@ -10,7 +10,7 @@ export const STRINGS = {
 
     'legal.title': 'Record responsibly',
     'legal.p1': 'Recording laws vary by jurisdiction. Some U.S. states — including California, Illinois, Washington, Pennsylvania and Florida — require <strong>everyone</strong> being recorded to consent. The EU (GDPR) and China (PIPL) impose additional duties.',
-    'legal.p2': 'You are responsible for having the right to record and process any audio you use with this tool.',
+    'legal.p2': 'You are responsible for having the right to record and process any audio you use with this tool. See <a href="LEGAL.md" target="_blank" rel="noopener">the full privacy &amp; recording notice</a> for details.',
     'legal.ok': 'I understand',
 
     'settings.title': 'Settings',
@@ -116,7 +116,7 @@ export const STRINGS = {
 
     'legal.title': '合法录音提示',
     'legal.p1': '录音相关法律因司法辖区而异。美国部分州（包括加州、伊利诺伊州、华盛顿州、宾夕法尼亚州和佛罗里达州）要求<strong>所有</strong>被录音者均须同意。欧盟（GDPR）与中国（个人信息保护法）另有规定。',
-    'legal.p2': '您需自行确保拥有录制及处理相关音频的合法权利。',
+    'legal.p2': '您需自行确保拥有录制及处理相关音频的合法权利。详见<a href="LEGAL.md" target="_blank" rel="noopener">完整的隐私与录音说明</a>。',
     'legal.ok': '我已了解',
 
     'settings.title': '设置',
@@ -221,7 +221,7 @@ export const STRINGS = {
 
     'legal.title': '録音は適法に',
     'legal.p1': '録音に関する法律は地域によって異なります。米国の一部の州（カリフォルニア、イリノイ、ワシントン、ペンシルベニア、フロリダなど）では、録音される<strong>全員</strong>の同意が必要です。EU（GDPR）と中国（PIPL）にも追加の義務があります。',
-    'legal.p2': 'このツールで使用する音声を録音・処理する権利があることは、ご自身の責任で確認してください。',
+    'legal.p2': 'このツールで使用する音声を録音・処理する権利があることは、ご自身の責任で確認してください。詳しくは<a href="LEGAL.md" target="_blank" rel="noopener">プライバシーと録音に関する説明</a>をご覧ください。',
     'legal.ok': '了解しました',
 
     'settings.title': '設定',
@@ -326,7 +326,7 @@ export const STRINGS = {
 
     'legal.title': '합법적으로 녹음하세요',
     'legal.p1': '녹음 관련 법률은 지역마다 다릅니다. 미국의 일부 주(캘리포니아, 일리노이, 워싱턴, 펜실베이니아, 플로리다 등)는 녹음되는 <strong>모든 사람</strong>의 동의를 요구합니다. EU(GDPR)와 중국(PIPL)에도 추가 의무가 있습니다.',
-    'legal.p2': '이 도구로 사용하는 오디오를 녹음하고 처리할 권리가 있는지 확인할 책임은 사용자에게 있습니다.',
+    'legal.p2': '이 도구로 사용하는 오디오를 녹음하고 처리할 권리가 있는지 확인할 책임은 사용자에게 있습니다. 자세한 내용은 <a href="LEGAL.md" target="_blank" rel="noopener">개인정보 및 녹음 안내</a>를 참조하세요.',
     'legal.ok': '이해했습니다',
 
     'settings.title': '설정',
@@ -431,7 +431,7 @@ export const STRINGS = {
 
     'legal.title': 'Graba de forma responsable',
     'legal.p1': 'Las leyes sobre grabación varían según la jurisdicción. Algunos estados de EE. UU. —California, Illinois, Washington, Pensilvania y Florida, entre otros— exigen el consentimiento de <strong>todas</strong> las personas grabadas. La UE (RGPD) y China (PIPL) imponen obligaciones adicionales.',
-    'legal.p2': 'Es tu responsabilidad tener derecho a grabar y procesar el audio que uses con esta herramienta.',
+    'legal.p2': 'Es tu responsabilidad tener derecho a grabar y procesar el audio que uses con esta herramienta. Consulta <a href="LEGAL.md" target="_blank" rel="noopener">el aviso completo de privacidad y grabación</a> para más detalles.',
     'legal.ok': 'Entendido',
 
     'settings.title': 'Ajustes',
@@ -536,7 +536,7 @@ export const STRINGS = {
 
     'legal.title': 'Enregistrez de façon responsable',
     'legal.p1': 'Les lois sur l\'enregistrement varient selon les juridictions. Certains États américains — Californie, Illinois, Washington, Pennsylvanie et Floride notamment — exigent le consentement de <strong>toutes</strong> les personnes enregistrées. L\'UE (RGPD) et la Chine (PIPL) imposent des obligations supplémentaires.',
-    'legal.p2': 'Il vous appartient de disposer du droit d\'enregistrer et de traiter tout audio utilisé avec cet outil.',
+    'legal.p2': 'Il vous appartient de disposer du droit d\'enregistrer et de traiter tout audio utilisé avec cet outil. Voir <a href="LEGAL.md" target="_blank" rel="noopener">l\'avis complet sur la confidentialité et l\'enregistrement</a> pour plus de détails.',
     'legal.ok': 'J\'ai compris',
 
     'settings.title': 'Paramètres',
@@ -641,7 +641,7 @@ export const STRINGS = {
 
     'legal.title': 'Verantwortungsvoll aufnehmen',
     'legal.p1': 'Die Gesetze zu Aufnahmen unterscheiden sich je nach Rechtsraum. Einige US-Bundesstaaten — darunter Kalifornien, Illinois, Washington, Pennsylvania und Florida — verlangen die Zustimmung <strong>aller</strong> Aufgenommenen. Die EU (DSGVO) und China (PIPL) stellen zusätzliche Anforderungen.',
-    'legal.p2': 'Du bist selbst dafür verantwortlich, das Recht zu haben, das verwendete Audio aufzunehmen und zu verarbeiten.',
+    'legal.p2': 'Du bist selbst dafür verantwortlich, das Recht zu haben, das verwendete Audio aufzunehmen und zu verarbeiten. Einzelheiten in <a href="LEGAL.md" target="_blank" rel="noopener">den vollständigen Datenschutz- und Aufnahmehinweisen</a>.',
     'legal.ok': 'Verstanden',
 
     'settings.title': 'Einstellungen',

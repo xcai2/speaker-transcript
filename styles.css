@@ -298,7 +298,8 @@ i.dot.spk-E { background: var(--e); } i.dot.spk-F { background: var(--f); }
   background: var(--brand-soft); display: grid; place-items: center; font-size: 20px; }
 #legal h2 { font-size: 17px; margin: 0 0 10px; letter-spacing: -.01em; }
 #legal p { font-size: 13.5px; line-height: 1.68; color: var(--muted); margin: 0 0 12px; }
-#legal .box a { color: var(--brand); }
+#legal .box a { color: var(--brand); font-weight: 600; text-underline-offset: 2px; }
+#legal .box a:hover { text-decoration-thickness: 2px; }
 
 footer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
   background: color-mix(in srgb, var(--card) 88%, transparent);
