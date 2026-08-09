@@ -200,7 +200,30 @@ input:focus, select:focus { outline: none; border-color: var(--v-400);
   border: none; background: none; color: var(--faint); cursor: pointer; font-size: 17px; line-height: 1; }
 #clearsearch:hover { color: var(--fg); }
 #searchnote { font-size: 12px; color: var(--faint); white-space: nowrap; }
-#export { width: auto; background: var(--card); font-weight: 600; font-size: 13.5px; }
+/* Tinted so the three actions stand out from the plain search field beside them.
+   AI Summary carries the brand violet as the headline action; Export takes a cooler
+   teal so the two are distinguishable at a glance rather than one violet blur. */
+#summarize {
+  background: linear-gradient(145deg,
+    color-mix(in srgb, var(--v-400) 20%, var(--card)),
+    color-mix(in srgb, var(--v-500) 26%, var(--card)));
+  border-color: color-mix(in srgb, var(--brand) 38%, transparent);
+  color: var(--brand);
+}
+#summarize:hover:not(:disabled) {
+  background: linear-gradient(145deg,
+    color-mix(in srgb, var(--v-400) 32%, var(--card)),
+    color-mix(in srgb, var(--v-500) 38%, var(--card)));
+  border-color: color-mix(in srgb, var(--brand) 55%, transparent);
+}
+
+#export {
+  width: auto; font-weight: 600; font-size: 13.5px;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 12%, var(--card));
+  border-color: color-mix(in srgb, var(--c) 34%, transparent);
+}
+#export:hover { background: color-mix(in srgb, var(--c) 20%, var(--card)); }
 
 /* ---------- stats ---------- */
 #stats { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
@@ -241,8 +264,18 @@ i.dot.spk-E { background: var(--e); } i.dot.spk-F { background: var(--f); }
 .time { font-size: 11px; color: var(--faint); margin-top: 4px; font-variant-numeric: tabular-nums; }
 
 /* ---------- summary ---------- */
+/* The AI notes panel gets a soft violet wash and a left accent, so a generated summary
+   reads as distinct from the transcript rows below it. */
 #summarybox { display: none; }
 #summarybox.show { display: block; }
+#summarybox {
+  background: linear-gradient(160deg,
+    color-mix(in srgb, var(--v-400) 11%, var(--card)),
+    color-mix(in srgb, var(--v-500) 5%, var(--card)));
+  border-color: color-mix(in srgb, var(--brand) 26%, transparent);
+  border-left: 3px solid var(--brand);
+}
+#summarybox h2 { color: var(--brand); }
 #summary h3 { font-size: 13.5px; margin: 18px 0 7px; color: var(--brand); font-weight: 650;
               text-transform: uppercase; letter-spacing: .04em; }
 #summary h3:first-child { margin-top: 4px; }
