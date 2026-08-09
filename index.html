@@ -107,6 +107,17 @@
         <label class="field" for="baseurl" data-i18n="settings.baseUrl">Base URL</label>
         <input type="text" id="baseurl" placeholder="https://your-endpoint/v1" autocomplete="off" spellcheck="false">
       </div>
+      <div class="sep"></div>
+
+      <div class="keyopts">
+        <label class="check">
+          <input type="checkbox" id="rememberkeys" checked>
+          <span data-i18n="settings.remember">Remember my keys in this browser</span>
+        </label>
+        <button class="bar" id="forgetkeys" data-i18n="settings.forget">Forget all keys</button>
+      </div>
+      <div class="note" data-i18n="settings.rememberNote">Uncheck on a shared or public computer — keys are then kept only until you close the tab.</div>
+
       <div class="note">
         <span data-i18n="settings.llmNote">Optional — only needed for summaries.</span>
         <a id="getkey" href="#" target="_blank" rel="noopener" data-i18n="settings.getKey">Get a key</a>

@@ -12,7 +12,7 @@ is static files on GitHub Pages.
 | Uploaded audio | Browser → the transcription provider you configured (AssemblyAI). Nowhere else. |
 | **Live-caption audio** | **Browser → your browser vendor's speech service.** See the warning below. |
 | Your transcript | Stays in the browser tab. Exports save to your machine. |
-| Your API keys | `localStorage` in your browser. Sent only to that provider's API. |
+| Your API keys | Your browser's storage, on this site's origin only. Sent only to that provider's API. Choose "remember" (persists) or session-only (cleared when the tab closes), and wipe them any time with **Forget all keys**. |
 | Summary text | Browser → the LLM provider you chose, only when you click **AI Summary**. |
 
 > **Live captions are not private.** The Web Speech API is implemented by the browser, and in

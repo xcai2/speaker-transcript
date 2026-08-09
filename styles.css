@@ -132,6 +132,11 @@ input:focus, select:focus { outline: none; border-color: var(--v-400);
 .note.err { color: var(--err); }
 .sep { height: 1px; background: var(--line); margin: 18px 0; }
 
+.keyopts { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px;
+         cursor: pointer; user-select: none; }
+.check input { width: auto; accent-color: var(--brand); cursor: pointer; }
+
 /* ---------- tabs ---------- */
 .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
 .tab { flex: 1; cursor: pointer; font-size: 13.5px; font-weight: 600; padding: 12px 14px;

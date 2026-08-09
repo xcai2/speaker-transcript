@@ -105,7 +105,9 @@ Free credit to start, then roughly $0.15–0.27 per hour of audio.
 | Qwen 通义千问 | [Bailian](https://bailian.console.aliyun.com/) |
 | Anything OpenAI-compatible | Ollama, vLLM, LM Studio, OpenRouter — pick **Custom** and set the base URL |
 
-Keys live in your browser's `localStorage` and are sent only to that provider.
+Keys live in your browser's storage and are sent only to that provider — never to any server
+of this project, because there isn't one. On a shared computer, untick **Remember my keys** to
+keep them only until the tab closes, or press **Forget all keys** to wipe them.
 
 ## Notes
 

@@ -75,14 +75,39 @@ function refreshDynamicText() {
   if (live) $('livego').textContent = live.wanted ? t('live.stop') : t('live.start');
 }
 
+/* ---------------- key storage ----------------
+   Keys default to localStorage so they survive a reload. On a shared or public computer
+   that is the wrong default, so `remember` switches to sessionStorage, which the browser
+   discards when the tab closes. Both are same-origin only — no other site can read them. */
+const keyStore = {
+  get remember() { return localStorage.getItem('remember_keys') !== '0'; },
+  set remember(v) {
+    localStorage.setItem('remember_keys', v ? '1' : '0');
+    // moving between stores: carry values across, then clear the one we left
+    const from = v ? sessionStorage : localStorage;
+    const to   = v ? localStorage : sessionStorage;
+    for (const k of KEY_NAMES) {
+      const val = from.getItem(k);
+      if (val !== null) { to.setItem(k, val); from.removeItem(k); }
+    }
+  },
+  store() { return this.remember ? localStorage : sessionStorage; },
+  get(k) { return sessionStorage.getItem(k) ?? localStorage.getItem(k); },
+  set(k, v) { this.store().setItem(k, v); },
+  del(k) { localStorage.removeItem(k); sessionStorage.removeItem(k); },
+  clearAll() { for (const k of KEY_NAMES) this.del(k); },
+};
+// every key-bearing entry, so switching modes or wiping covers all of them
+const KEY_NAMES = ['aai_key', ...Object.keys(PROVIDERS).map(p => 'llm_key_' + p)];
+
 /* ---------------- settings: transcription key ---------------- */
 const keyInput = $('key');
-keyInput.value = localStorage.getItem('aai_key') || '';
+keyInput.value = keyStore.get('aai_key') || '';
 if (keyInput.value) $('keynote').textContent = t('settings.hasKey');
 $('savekey').onclick = () => {
   const v = keyInput.value.trim();
-  if (v) { localStorage.setItem('aai_key', v); $('keynote').textContent = t('settings.saved'); }
-  else { localStorage.removeItem('aai_key'); $('keynote').textContent = t('settings.cleared'); }
+  if (v) { keyStore.set('aai_key', v); $('keynote').textContent = t(keyStore.remember ? 'settings.saved' : 'settings.savedSession'); }
+  else { keyStore.del('aai_key'); $('keynote').textContent = t('settings.cleared'); }
   refresh();
 };
 keyInput.oninput = refresh;
@@ -105,7 +130,7 @@ function syncProvider() {
     if (![...modelSel.options].some(o => o.value === remembered)) modelSel.append(new Option(remembered, remembered));
     modelSel.value = remembered;
   }
-  llmKey.value = localStorage.getItem('llm_key_' + provSel.value) || '';
+  llmKey.value = keyStore.get('llm_key_' + provSel.value) || '';
   baseInput.value = localStorage.getItem('llm_base_' + provSel.value) || cfg.base;
   $('provnote').textContent = cfg.note || '';
   $('getkey').href = cfg.keyUrl || '#';
@@ -118,17 +143,32 @@ syncProvider();
 $('savellm').onclick = () => {
   const p = provSel.value;
   const k = llmKey.value.trim();
-  if (k) localStorage.setItem('llm_key_' + p, k); else localStorage.removeItem('llm_key_' + p);
+  if (k) keyStore.set('llm_key_' + p, k); else keyStore.del('llm_key_' + p);
   localStorage.setItem('llm_model_' + p, modelSel.value);
   const b = baseInput.value.trim();
   if (b) localStorage.setItem('llm_base_' + p, b); else localStorage.removeItem('llm_base_' + p);
-  $('llmnote').textContent = k ? t('settings.saved') : t('settings.cleared');
+  $('llmnote').textContent = k ? t(keyStore.remember ? 'settings.saved' : 'settings.savedSession') : t('settings.cleared');
 };
 
 // let the user type a model name that isn't in the list
 $('addmodel').onclick = () => {
   const m = prompt(t('settings.modelPrompt'));
   if (m) { modelSel.append(new Option(m, m)); modelSel.value = m; }
+};
+
+/* remember-keys toggle and the wipe button */
+$('rememberkeys').checked = keyStore.remember;
+$('rememberkeys').onchange = e => {
+  keyStore.remember = e.target.checked;
+  $('keynote').textContent = t(e.target.checked ? 'settings.saved' : 'settings.savedSession');
+};
+$('forgetkeys').onclick = () => {
+  keyStore.clearAll();
+  keyInput.value = '';
+  llmKey.value = '';
+  $('keynote').textContent = t('settings.cleared');
+  $('llmnote').textContent = '';
+  refresh();
 };
 
 function syncSettingsToggle() {
