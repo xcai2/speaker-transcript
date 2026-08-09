@@ -44,8 +44,10 @@ export const LANGS = [
 
    The engine stops on its own after a pause or ~60s; `restart` on end is what turns it into
    a continuous session. `wanted` distinguishes a deliberate stop from an automatic one. */
+const MAX_NET_RETRIES = 4;
+
 export class LiveSession {
-  constructor({ lang, onFinal, onInterim, onState, onError }) {
+  constructor({ lang, onFinal, onInterim, onState, onError, onNotice }) {
     const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
     this.rec = new Ctor();
     this.rec.continuous = true;
@@ -54,9 +56,18 @@ export class LiveSession {
     this.wanted = false;
     this.running = false;
     this.startedAt = 0;
+    this.netFails = 0;        // consecutive 'network' errors
+    this.retryAt = 0;         // earliest time the next restart may run
+    this.retryTimer = null;
     this.lines = [];          // { text, at } — at = ms from session start
     this.onFinal = onFinal; this.onInterim = onInterim;
-    this.onState = onState; this.onError = onError;
+    this.onState = onState; this.onError = onError; this.onNotice = onNotice;
+
+    // Audio flowing again means the connection recovered; forget earlier failures
+    // so a long session isn't killed by unrelated blips accumulating.
+    this.rec.onaudiostart = () => {
+      if (this.netFails) { this.netFails = 0; this.onNotice?.(''); }
+    };
 
     this.rec.onresult = e => {
       let interim = '';
@@ -79,37 +90,62 @@ export class LiveSession {
       // 'no-speech' and 'aborted' are routine during a long session
       if (e.error === 'no-speech' || e.error === 'aborted') return;
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-        this.wanted = false;
-        this.onError?.('Microphone permission denied. Allow mic access and try again.');
-        if (this.running) { this.running = false; this.onState?.('stopped'); }
+        this.fail('Microphone permission denied. Allow mic access and try again.');
         return;
       }
       if (e.error === 'network') {
-        this.wanted = false;
-        try { this.rec.abort(); } catch { /* not running */ }
-        this.onError?.(secureOrigin()
-          ? 'The speech service could not be reached. Check your connection — the browser engine needs one — and note that some networks block it.'
-          : 'Live captions need a secure origin. This page is running from ' + location.protocol
-            + '// — open it over https (the hosted demo) or from http://localhost instead.');
-        if (this.running) { this.running = false; this.onState?.('stopped'); }
+        // An insecure origin fails this way every time and will never recover.
+        if (!secureOrigin()) {
+          this.fail('Live captions need a secure origin. This page is running from '
+            + location.protocol + '// — open it over https (the hosted demo) or from '
+            + 'http://localhost instead.');
+          return;
+        }
+        // Otherwise this is usually transient: the engine drops its connection between
+        // restarts, especially after silence. Back off and retry rather than giving up —
+        // only a sustained run of failures is worth surfacing.
+        this.netFails++;
+        if (this.netFails <= MAX_NET_RETRIES) {
+          this.onNotice?.(null, { retry: this.netFails, max: MAX_NET_RETRIES });
+          this.retryAt = Date.now() + this.netFails * 1200;
+          return;   // onend schedules the retry
+        }
+        this.fail(null, 'lost');
         return;
       }
       this.onError?.('Recognition error: ' + e.error);
     };
 
     this.rec.onend = () => {
-      if (this.wanted) {
-        // engine timed out; keep the session alive
-        try { this.rec.start(); } catch { /* already starting */ }
-      } else if (this.running) {
-        this.running = false;
-        this.onState?.('stopped');
+      if (!this.wanted) {
+        if (this.running) { this.running = false; this.onState?.('stopped'); }
+        return;
       }
+      // The engine stops on its own after a pause or ~60s. Restart to keep the session
+      // alive, waiting first if the last attempt failed so we don't spin on a hot loop.
+      const wait = Math.max(0, (this.retryAt || 0) - Date.now());
+      this.retryAt = 0;
+      clearTimeout(this.retryTimer);
+      this.retryTimer = setTimeout(() => {
+        if (!this.wanted) return;
+        try { this.rec.start(); } catch { /* already starting */ }
+      }, wait);
     };
+  }
+
+  /* Give up for real: stop, tell the caller, and reset the button.
+     `code` lets the caller substitute a localized message for a known failure. */
+  fail(msg, code) {
+    this.wanted = false;
+    clearTimeout(this.retryTimer);
+    try { this.rec.abort(); } catch { /* not running */ }
+    this.onError?.(msg, code);
+    if (this.running) { this.running = false; this.onState?.('stopped'); }
   }
 
   start() {
     this.wanted = true;
+    this.netFails = 0;
     if (!this.startedAt) this.startedAt = Date.now();
     try { this.rec.start(); this.running = true; this.onState?.('running'); }
     catch (e) { this.onError?.(e.message || String(e)); }
@@ -117,6 +153,7 @@ export class LiveSession {
 
   stop() {
     this.wanted = false;
+    clearTimeout(this.retryTimer);
     try { this.rec.stop(); } catch { /* not running */ }
   }
 

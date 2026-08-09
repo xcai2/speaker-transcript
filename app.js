@@ -268,7 +268,17 @@ $('livego').onclick = () => {
       $('livego').textContent = running ? t('live.stop') : t('live.start');
       if (running) { $('livenote').className = 'note'; $('livenote').textContent = t('live.listening'); }
     },
-    onError: msg => { $('livenote').className = 'note err'; $('livenote').textContent = msg; },
+    onError: (msg, code) => {
+      $('livenote').className = 'note err';
+      $('livenote').textContent = code === 'lost' ? t('live.lost') : msg;
+    },
+    // transient reconnects are informational, not errors
+    onNotice: (msg, info) => {
+      $('livenote').className = 'note';
+      $('livenote').textContent = info
+        ? `${t('live.reconnecting')} (${info.retry}/${info.max})…`
+        : (msg || (live && live.wanted ? t('live.listening') : ''));
+    },
   });
   live.start();
   window.__live = live;   // exposed for tests

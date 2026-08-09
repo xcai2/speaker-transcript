@@ -58,6 +58,8 @@ export const STRINGS = {
     'live.captured': 'lines captured. They are now in the transcript below.',
     'live.unsupported': 'Your browser does not support the Web Speech API. Live captions work in Chrome, Edge and Safari; Firefox is not supported.',
     'live.insecure': 'Live captions need a secure origin. Open the hosted demo over https, or serve this page from http://localhost.',
+    'live.reconnecting': 'Reconnecting to the speech service',
+    'live.lost': 'Lost the connection to the speech service after several attempts. Check your network — the browser engine needs one — then press Start again. Some corporate or campus networks block it.',
 
     'toolbar.search': 'Search the transcript…',
     'toolbar.summary': '✨ AI Summary',
@@ -137,6 +139,8 @@ export const STRINGS = {
     'live.captured': '条记录已捕获，已生成下方的文字稿。',
     'live.unsupported': '您的浏览器不支持 Web Speech API。实时字幕支持 Chrome、Edge 和 Safari，不支持 Firefox。',
     'live.insecure': '实时字幕需要安全来源。请通过 https 打开在线版本，或用 http://localhost 提供此页面。',
+    'live.reconnecting': '正在重新连接语音服务',
+    'live.lost': '多次尝试后仍无法连接语音服务。请检查网络（浏览器语音引擎需要联网），然后重新点击「开始聆听」。部分企业或校园网络会屏蔽该服务。',
 
     'toolbar.search': '搜索文字稿…',
     'toolbar.summary': '✨ AI 摘要',
