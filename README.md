@@ -36,8 +36,9 @@ under NDA — cloud transcription is usually off the table. That's the gap this 
 ## Features
 
 - **Two modes** — upload a file, or record from your microphone
-- **Recording** — captures the audio, then transcribes the complete file, so nothing is lost
-  and you still get speaker separation. Live captions show while you record as a rough preview.
+- **Recording** — live transcript appears as you speak (AssemblyAI streaming), while the audio
+  is captured in parallel. On stop, the complete recording is transcribed again to add speaker
+  separation, so you see words immediately and still lose nothing.
 - **Speaker separation** — up to six speakers, colour-coded
 - **Click any line to play it** — jumps straight to that moment
 - **Rename speakers** — "Speaker A" → "Sarah", updates everywhere including exports
@@ -56,17 +57,17 @@ Open the [demo](https://xcai2.github.io/timbrio/) and pick a mode:
 **📁 Upload a recording** — paste your AssemblyAI key into Settings, then drop in a file.
 Gives you speaker separation and the highest accuracy.
 
-**🎙 Record** — click Start recording and talk. The audio is captured in your browser and
-transcribed the same way an uploaded file is, so you get every sentence plus speaker
-separation. If transcription fails, the recording is offered as a download so it is never
-lost.
+**🎙 Record** — click Start recording and talk. Text appears live as you speak, and the audio
+is recorded at the same time; when you stop, the full recording is transcribed again to add
+speaker separation. If that final pass fails, the recording is offered as a download so it is
+never lost.
 
 ![Recording](docs/live.png)
 
-> Why not stream the audio for live transcription? The browser's Web Speech API is a
-> dictation API: it discards audio it cannot finalize and times out on silence, so a real
-> conversation loses sentences. Recording first and transcribing the complete file is the
-> only way to be sure nothing is missed.
+> Two passes, because they do different jobs. Streaming gives words within a few hundred
+> milliseconds but labels turns, not identities. The pass over the complete recording is
+> slower but adds speaker separation and cannot miss anything. Running both is what gives
+> you live feedback *and* an accurate final transcript.
 
 Optionally add a model provider key for AI summaries in either mode.
 
@@ -128,6 +129,7 @@ responsible for having the right to record and process any audio you use here.
 | `index.html` | The web app |
 | `app.js` | Upload, transcription, rendering, search, summary |
 | `record.js` | Microphone capture via MediaRecorder |
+| `stream.js` | Live transcription over AssemblyAI's streaming WebSocket |
 | `live.js` | Live caption preview via the Web Speech API |
 | `i18n.js` | English / 中文 interface strings |
 | `transcript.js` | Sentence splitting and every export format |

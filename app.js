@@ -4,6 +4,7 @@ import {
 } from './transcript.js';
 import { PROVIDERS, summarize, buildPrompt, estimateTokens } from './llm.js';
 import { Recorder, recordingSupported } from './record.js';
+import { LiveStream } from './stream.js';
 import { LiveSession, isSupported as liveSupported, secureOrigin, browserNote,
          localModelState, installLocalModel, probeConnectivity, LANGS } from './live.js';
 import { t, setLang, getLang, detectLang, apply as applyI18n } from './i18n.js';
@@ -224,6 +225,7 @@ $('go').onclick = async () => {
    captions run alongside purely as a preview, because the Web Speech API drops speech
    it cannot finalize and can never be made reliable enough to be the record itself. */
 let recorder = null;
+let liveStream = null;
 
 for (const [code, label] of LANGS) $('lang').append(new Option(label, code));
 $('lang').value = localStorage.getItem('live_lang') || 'en-US';
@@ -290,23 +292,27 @@ $('livego').onclick = async () => {
   $('livego').textContent = t('live.stop');
   $('rectime').classList.add('live');
 
-  // Best-effort preview. If it fails there is nothing to fix — the recording is the record.
-  if (liveSupported() && secureOrigin()) {
-    live = new LiveSession({
-      lang: $('lang').value,
-      onFinal: ({ text }) => {
-        const p = document.createElement('p');
-        p.textContent = text;
-        $('livetext').append(p);
-        $('livebox').scrollTop = $('livebox').scrollHeight;
-      },
-      onInterim: txt => { $('interim').textContent = txt; },
-      onState: () => {}, onError: () => {}, onNotice: () => {},
-    });
-    live.canTryLocal = localReady;
-    live.start();
-    window.__live = live;
-  }
+  // Live transcript from AssemblyAI's streaming API, over the same mic stream. Accurate
+  // enough to be the real thing rather than a rough preview; speaker labels still come
+  // from the final pass once the full recording is available.
+  liveStream = new LiveStream({
+    apiKey: key,
+    stream: recorder.stream,
+    lang: $('lang').value,
+    onPartial: txt => { $('interim').textContent = txt; $('livebox').scrollTop = $('livebox').scrollHeight; },
+    onFinal: txt => {
+      const p = document.createElement('p');
+      p.textContent = txt;
+      $('livetext').append(p);
+      $('interim').textContent = '';
+      $('livebox').scrollTop = $('livebox').scrollHeight;
+    },
+    onState: st => {
+      if (st === 'connected') { $('livenote').className = 'note'; $('livenote').textContent = t('live.recording'); }
+    },
+    onError: msg => { $('livenote').className = 'note'; $('livenote').textContent = msg + ' ' + t('live.stillRecording'); },
+  });
+  liveStream.start().catch(() => {});
 };
 
 async function finishRecording() {
@@ -316,6 +322,7 @@ async function finishRecording() {
   $('rectime').classList.remove('live');
   $('meterwrap').classList.remove('show');
   $('interim').textContent = '';
+  if (liveStream) { liveStream.stop(); liveStream = null; }
   if (live) { live.stop(); live = null; }
 
   const file = await recorder.stop();
