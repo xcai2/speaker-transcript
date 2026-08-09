@@ -25,7 +25,7 @@ because there is no server.
 |---|---|---|
 | Your audio | Uploaded to their servers | **Never leaves your browser** except to the API you chose |
 | Account | Required | **None** |
-| Cost | Free tier, then ~$17/mo | **~$0.15–0.27 per hour** of audio, paid to AssemblyAI directly |
+| Cost | Free tier 300 min/mo, then ~$17/mo | **$50 free credit (~200 hours)**, then ~$0.23/hour, paid to AssemblyAI directly |
 | Chinese + English | One is usually weak | **Both handled properly** |
 | Your data | Their retention policy | **Yours. Nothing is stored.** |
 | Summary model | Whatever they picked | **Any model you like** — GPT, Claude, DeepSeek, Kimi, Doubao, Qwen, local |
@@ -91,7 +91,14 @@ cp .env.example .env      # add your key
 ## Getting keys
 
 **Transcription (required)** — [AssemblyAI](https://www.assemblyai.com/dashboard/signup).
-Free credit to start, then roughly $0.15–0.27 per hour of audio.
+New accounts get **$50 of credit, no card required**. At the settings this app uses
+(Universal-3.5 Pro plus speaker diarization, ~$0.23/hour) that is roughly **200 hours** of
+audio before you pay anything. The credit is a one-time allocation, not a monthly refill,
+but at a few hours a month it lasts years.
+
+Note that the Record tab bills twice: once for the live stream and once for the final
+speaker-separated pass. Streaming is also billed on **connection time**, not audio length,
+so a session left open while nobody speaks still costs. Upload mode bills once.
 
 **Summaries (optional)** — any one of:
 
@@ -135,7 +142,7 @@ responsible for having the right to record and process any audio you use here.
 | `record.js` | Microphone capture via MediaRecorder |
 | `stream.js` | Live transcription over AssemblyAI's streaming WebSocket |
 | `live.js` | Live caption preview via the Web Speech API |
-| `i18n.js` | English / 中文 interface strings |
+| `i18n.js` | Interface strings for 7 languages |
 | `transcript.js` | Sentence splitting and every export format |
 | `llm.js` | Model provider clients |
 | `transcribe.py` | The CLI version |
