@@ -19,9 +19,9 @@ because there is no server.
 
 ---
 
-## Why this instead of Otter or 飞书妙记
+## Why this instead of Otter or Lark Minutes
 
-| | Otter / Feishu Miaoji | This |
+| | Otter / Lark Minutes (飞书妙记) | This |
 |---|---|---|
 | Your audio | Uploaded to their servers | **Never leaves your browser** except to the API you chose |
 | Account | Required | **None** |
