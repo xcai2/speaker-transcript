@@ -1,42 +1,38 @@
 # Deploying Timbrio
 
-The app is static files — no build step, no server. Any static host works.
+The app is static files — no build step, no server. It is served by **GitHub Pages** from
+the `main` branch at <https://xcai2.github.io/timbrio/>.
 
-## Option A — free subdomain (no purchase)
+## Publishing a change
 
 ```bash
-./deploy.sh
+git add -A
+git commit -m "…"
+git push
 ```
 
-Opens a browser to authorise, then asks for a site name. Enter `timbrio` and the site
-is live at `https://timbrio.netlify.app`.
+Pages rebuilds automatically, usually within a minute. Check the build:
 
-Use the script rather than calling the CLI directly. `netlify deploy` uploads whatever
-directory it is given, and this folder also holds recordings, transcripts and `.env`.
-`deploy.sh` exports the tracked files with `git archive` first, prints exactly what will
-be published, and aborts if anything sensitive appears in the export.
+```bash
+gh api repos/xcai2/timbrio/pages/builds/latest --jq '.status'
+```
 
-## Option B — your own domain (like example.app)
+## After deploying
 
-1. **Buy the domain.** [Porkbun](https://porkbun.com) and [Namecheap](https://www.namecheap.com)
-   are the usual choices. Rough yearly prices: `.com` ~$11, `.app` ~$14, `.io` ~$35,
-   `.ai` ~$70. `.app` is on the HSTS preload list, so it is https-only by default —
-   good for a tool that handles microphone input.
+Hard-refresh once (**Cmd+Shift+R** / **Ctrl+F5**). The JavaScript modules and `index.html`
+are cached independently, and a stale `index.html` paired with fresh modules has broken the
+page before — the new code looked for an element the cached HTML did not have. The code now
+guards those lookups, but a hard refresh is still the quickest way to be sure.
 
-2. **Point it at the host.** In Netlify: *Site settings → Domain management → Add domain*.
-   Netlify shows the DNS records to create; add them at the registrar. Two options:
-   - **Nameservers** (simplest): change the registrar's nameservers to Netlify's.
-   - **Records**: add `A @ 75.2.60.5` and `CNAME www <site>.netlify.app`.
+## What is published
 
-3. **Wait for DNS**, usually minutes, occasionally up to a day. Netlify issues a
-   Let's Encrypt certificate automatically once the domain resolves.
+Everything tracked in git. Recordings, transcripts, `.env` and `PLAN.md` are gitignored and
+stay local — confirm with `git status --porcelain` before pushing.
 
-4. **Update the links** in `README.md` to the new address.
+## Using a custom domain later
 
-## Notes
-
-- `netlify.toml` sets `Cache-Control: no-cache` on `index.html`. The modules are versioned
-  by content but the HTML is not, and a stale `index.html` paired with fresh JS has broken
-  the page before — a element the new code expects simply is not there.
-- GitHub Pages can also take a custom domain (*Settings → Pages → Custom domain*), but it
-  requires a `CNAME` file in the repo and still serves from the same repository.
+Buy a domain (~$11–15/year for `.com` or `.app`), then *Settings → Pages → Custom domain*.
+GitHub writes a `CNAME` file into the repo and issues an HTTPS certificate once DNS resolves.
+At the registrar, point the apex record at GitHub's IPs (`185.199.108–111.153`) and `www` at
+`xcai2.github.io`. `.app` is HTTPS-only by default, which suits a page that needs microphone
+access.

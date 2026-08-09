@@ -4,7 +4,6 @@
 export const STRINGS = {
   en: {
     'brand.tag': "Hear who's speaking",
-    'header.privacy': 'Privacy',
     'hint.default': 'Upload a recording to get a speaker-separated transcript',
     'hint.ready': 'Click a speaker button to play that segment',
     'hint.live': 'Live session captured — search, summarize or export it',
@@ -111,7 +110,6 @@ export const STRINGS = {
 
   zh: {
     'brand.tag': '听清每个人在说什么',
-    'header.privacy': '隐私',
     'hint.default': '上传录音，获得按说话人分离的文字稿',
     'hint.ready': '点击说话人按钮播放对应片段',
     'hint.live': '实时记录已保存 — 可搜索、总结或导出',
@@ -217,7 +215,6 @@ export const STRINGS = {
   },
   ja: {
     'brand.tag': '誰が話しているかを聞き分ける',
-    'header.privacy': 'プライバシー',
     'hint.default': '録音をアップロードすると話者ごとに分かれた文字起こしが得られます',
     'hint.ready': '話者ボタンをクリックするとその部分が再生されます',
     'hint.live': 'ライブ記録を保存しました — 検索・要約・書き出しができます',
@@ -323,7 +320,6 @@ export const STRINGS = {
   },
   ko: {
     'brand.tag': '누가 말하는지 들어보세요',
-    'header.privacy': '개인정보',
     'hint.default': '녹음을 업로드하면 화자별로 분리된 텍스트를 받을 수 있습니다',
     'hint.ready': '화자 버튼을 클릭하면 해당 구간이 재생됩니다',
     'hint.live': '실시간 기록 완료 — 검색, 요약, 내보내기가 가능합니다',
@@ -429,7 +425,6 @@ export const STRINGS = {
   },
   es: {
     'brand.tag': 'Escucha quién habla',
-    'header.privacy': 'Privacidad',
     'hint.default': 'Sube una grabación para obtener una transcripción separada por hablante',
     'hint.ready': 'Haz clic en un botón de hablante para reproducir ese fragmento',
     'hint.live': 'Sesión en directo guardada — búscala, resúmela o expórtala',
@@ -535,7 +530,6 @@ export const STRINGS = {
   },
   fr: {
     'brand.tag': 'Entendez qui parle',
-    'header.privacy': 'Confidentialité',
     'hint.default': 'Importez un enregistrement pour obtenir une transcription par locuteur',
     'hint.ready': 'Cliquez sur un bouton de locuteur pour lire ce passage',
     'hint.live': 'Session en direct enregistrée — recherchez, résumez ou exportez',
@@ -641,7 +635,6 @@ export const STRINGS = {
   },
   de: {
     'brand.tag': 'Hören, wer spricht',
-    'header.privacy': 'Datenschutz',
     'hint.default': 'Lade eine Aufnahme hoch für ein nach Sprechern getrenntes Transkript',
     'hint.ready': 'Klicke auf eine Sprecher-Schaltfläche, um diesen Abschnitt abzuspielen',
     'hint.live': 'Live-Sitzung gespeichert — durchsuchen, zusammenfassen oder exportieren',
