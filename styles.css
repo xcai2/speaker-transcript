@@ -156,6 +156,15 @@ input:focus, select:focus { outline: none; border-color: var(--v-400);
   border-radius: 50%; background: #fff; animation: pulse 1.2s infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
 
+/* mic level: shows the mic is picking you up even when the recognizer is between
+   sessions, so silence is distinguishable from a dead input */
+#meterwrap { display: none; height: 5px; border-radius: 3px; background: var(--line);
+             margin-top: 12px; overflow: hidden; }
+#meterwrap.show { display: block; }
+#meter { height: 100%; width: 0%; border-radius: 3px;
+         background: linear-gradient(90deg, var(--v-400), var(--v-600));
+         transition: width .08s linear; }
+
 /* ---------- dropzone ---------- */
 #drop { border: 2px dashed var(--line); border-radius: 14px; padding: 30px 20px;
   text-align: center; cursor: pointer; background: var(--bg); transition: all .15s; }

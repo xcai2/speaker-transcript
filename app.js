@@ -319,6 +319,10 @@ $('livego').onclick = () => {
       $('livego').textContent = running ? t('live.stop') : t('live.start');
       if (running) { $('livenote').className = 'note'; $('livenote').textContent = t('live.listening'); }
     },
+    onLevel: v => {
+      $('meterwrap').classList.toggle('show', !!(live && live.wanted));
+      $('meter').style.width = Math.round(v * 100) + '%';
+    },
     onError: (msg, code) => {
       if (code === 'lost' || code === 'lost-both') diagnose(code);
       else { $('livenote').className = 'note err'; $('livenote').textContent = msg; }
@@ -344,6 +348,7 @@ function stopLive() {
   // the session is over either way — make sure the button reflects that
   $('livego').classList.remove('listening');
   $('livego').textContent = t('live.start');
+  $('meterwrap').classList.remove('show');
   const segs = live.toSegments();
   if (!segs.length) {
     $('livenote').className = 'note';

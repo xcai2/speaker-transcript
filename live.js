@@ -76,7 +76,7 @@ export const LANGS = [
 const MAX_NET_RETRIES = 4;
 
 export class LiveSession {
-  constructor({ lang, onFinal, onInterim, onState, onError, onNotice }) {
+  constructor({ lang, onFinal, onInterim, onState, onError, onNotice, onLevel }) {
     const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
     this.rec = new Ctor();
     this.rec.continuous = true;
@@ -91,8 +91,22 @@ export class LiveSession {
     this.retryAt = 0;         // earliest time the next restart may run
     this.retryTimer = null;
     this.lines = [];          // { text, at } — at = ms from session start
+    this.pendingInterim = ''; // heard but not yet finalized; salvaged on restart
     this.onFinal = onFinal; this.onInterim = onInterim;
     this.onState = onState; this.onError = onError; this.onNotice = onNotice;
+    this.onLevel = onLevel;
+
+    /* Record one recognized line. Restart salvage and overlapping recognizers can both
+       surface the same phrase, so drop an exact repeat of the previous line. */
+    this.commit = (text, at) => {
+      const clean = (text || '').trim();
+      if (!clean) return;
+      const prev = this.lines[this.lines.length - 1];
+      if (prev && prev.text === clean) return;
+      const entry = { text: clean, at: at ?? (Date.now() - this.startedAt) };
+      this.lines.push(entry);
+      this.onFinal?.(entry);
+    };
 
     // Only a real result proves the service is working. onaudiostart fires whenever the
     // mic opens — including on a doomed retry — so resetting there let a permanently
@@ -109,14 +123,16 @@ export class LiveSession {
         const text = (r[0] && r[0].transcript || '').trim();
         if (!text) continue;
         if (r.isFinal) {
-          const at = Date.now() - this.startedAt;
-          this.lines.push({ text, at });
-          this.onFinal?.({ text, at });
+          this.pendingInterim = '';
+          this.commit(text);
         } else {
           interim += text + ' ';
         }
       }
-      this.onInterim?.(interim.trim());
+      // Remember the latest interim text. The engine often ends a session before
+      // finalizing what it heard; without this that sentence would vanish.
+      this.pendingInterim = interim.trim();
+      this.onInterim?.(this.pendingInterim);
     };
 
     this.rec.onerror = e => {
@@ -162,12 +178,21 @@ export class LiveSession {
     };
 
     this.rec.onend = () => {
+      // The engine ends without finalizing whatever it was mid-way through; keep it
+      // rather than letting the sentence disappear at the restart boundary.
+      if (this.pendingInterim) {
+        this.commit(this.pendingInterim);
+        this.pendingInterim = '';
+        this.onInterim?.('');
+      }
       if (!this.wanted) {
         if (this.running) { this.running = false; this.onState?.('stopped'); }
         return;
       }
       // The engine stops on its own after a pause or ~60s. Restart to keep the session
       // alive, waiting first if the last attempt failed so we don't spin on a hot loop.
+      // Restart immediately unless a failure asked us to back off. Every restart costs
+      // roughly a quarter-second during which the mic is deaf, so don't add to it.
       const wait = Math.max(0, (this.retryAt || 0) - Date.now());
       this.retryAt = 0;
       clearTimeout(this.retryTimer);
@@ -183,6 +208,7 @@ export class LiveSession {
   fail(msg, code) {
     this.wanted = false;
     clearTimeout(this.retryTimer);
+    this.stopMeter();
     try { this.rec.abort(); } catch { /* not running */ }
     this.onError?.(msg, code);
     if (this.running) { this.running = false; this.onState?.('stopped'); }
@@ -194,6 +220,42 @@ export class LiveSession {
     if (!this.startedAt) this.startedAt = Date.now();
     try { this.rec.start(); this.running = true; this.onState?.('running'); }
     catch (e) { this.onError?.(e.message || String(e)); }
+    this.startMeter();
+  }
+
+  /* A live input-level meter, independent of recognition. It answers the question the
+     engine cannot: "is the mic actually picking me up?" — which distinguishes a bad mic
+     from a recognizer that is dropping speech. */
+  async startMeter() {
+    if (this.meterStream || !this.onLevel) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.meterStream = stream;
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.meterCtx = ctx;
+      const src = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      src.connect(analyser);
+      const buf = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        if (!this.wanted) return;
+        analyser.getByteTimeDomainData(buf);
+        let peak = 0;
+        for (const v of buf) peak = Math.max(peak, Math.abs(v - 128));
+        this.onLevel?.(Math.min(1, peak / 60));   // 0..1, ~60 is a normal speaking peak
+        this.meterRaf = requestAnimationFrame(tick);
+      };
+      tick();
+    } catch { /* meter is a nicety; recognition still works without it */ }
+  }
+
+  stopMeter() {
+    cancelAnimationFrame(this.meterRaf);
+    this.meterStream?.getTracks().forEach(t => t.stop());
+    this.meterCtx?.close().catch(() => {});
+    this.meterStream = null; this.meterCtx = null;
+    this.onLevel?.(0);
   }
 
   /* Stop must always reset the UI. If the engine is mid-retry it isn't actually running,
@@ -202,6 +264,7 @@ export class LiveSession {
   stop() {
     this.wanted = false;
     clearTimeout(this.retryTimer);
+    this.stopMeter();
     this.retryAt = 0;
     try { this.rec.stop(); } catch { /* not running */ }
     try { this.rec.abort(); } catch { /* not running */ }
