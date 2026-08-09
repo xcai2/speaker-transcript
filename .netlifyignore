@@ -1,0 +1,11 @@
+# Local-only material — never publish these even if they sit in the folder
+*.m4a
+*.mp3
+*.wav
+*.mp4
+*.txt
+*- transcript.html
+.env
+.venv/
+PLAN.md
+__pycache__/

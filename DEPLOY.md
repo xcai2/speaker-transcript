@@ -5,11 +5,16 @@ The app is static files — no build step, no server. Any static host works.
 ## Option A — free subdomain (no purchase)
 
 ```bash
-npx netlify-cli deploy --prod
+./deploy.sh
 ```
 
 Opens a browser to authorise, then asks for a site name. Enter `timbrio` and the site
-is live at `https://timbrio.netlify.app`. Vercel works the same way (`npx vercel --prod`).
+is live at `https://timbrio.netlify.app`.
+
+Use the script rather than calling the CLI directly. `netlify deploy` uploads whatever
+directory it is given, and this folder also holds recordings, transcripts and `.env`.
+`deploy.sh` exports the tracked files with `git archive` first, prints exactly what will
+be published, and aborts if anything sensitive appears in the export.
 
 ## Option B — your own domain (like example.app)
 
