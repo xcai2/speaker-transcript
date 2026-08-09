@@ -27,6 +27,35 @@ export function browserNote() {
   return '';
 }
 
+/* Newer Chrome can run recognition on-device, which works even when the cloud endpoint
+   is unreachable — the usual cause of a 'network' error that isn't really the network
+   (a blocking extension, a firewall rule, or regional blocking of Google services).
+   Returns 'unavailable' | 'downloadable' | 'downloading' | 'available'. */
+export async function localModelState(lang) {
+  const C = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!C || typeof C.available !== 'function') return 'unavailable';
+  try { return await C.available({ langs: [lang], processLocally: true }); }
+  catch { return 'unavailable'; }
+}
+
+/* Ask Chrome to download the on-device model. Resolves true when it is ready to use. */
+export async function installLocalModel(lang) {
+  const C = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!C || typeof C.install !== 'function') return false;
+  try { return await C.install({ langs: [lang] }); }
+  catch { return false; }
+}
+
+/* Distinguish "the whole network is down" from "only the speech endpoint is blocked".
+   If the page can reach the internet but recognition reports 'network', the cause is
+   almost always an extension or firewall rule aimed at Google's speech service. */
+export async function probeConnectivity() {
+  try {
+    await fetch('https://www.gstatic.com/generate_204', { mode: 'no-cors', cache: 'no-store' });
+    return 'online';
+  } catch { return 'offline'; }
+}
+
 export const LANGS = [
   ['en-US', 'English (US)'],
   ['en-GB', 'English (UK)'],
@@ -57,6 +86,8 @@ export class LiveSession {
     this.running = false;
     this.startedAt = 0;
     this.netFails = 0;        // consecutive 'network' errors
+    this.triedLocal = false;  // have we fallen back to the on-device model yet?
+    this.canTryLocal = false; // set by the caller when a local model is installed
     this.retryAt = 0;         // earliest time the next restart may run
     this.retryTimer = null;
     this.lines = [];          // { text, at } — at = ms from session start
@@ -106,6 +137,16 @@ export class LiveSession {
         // Otherwise this is usually transient: the engine drops its connection between
         // restarts, especially after silence. Back off and retry rather than giving up —
         // only a sustained run of failures is worth surfacing.
+        // Before burning retries on an endpoint that may be blocked outright, try
+        // switching to the on-device model once — it needs no network at all.
+        if (!this.triedLocal && this.canTryLocal) {
+          this.triedLocal = true;
+          this.onNotice?.(null, { switchingLocal: true });
+          this.retryAt = Date.now() + 300;
+          try { this.rec.processLocally = true; } catch { /* older Chrome */ }
+          return;
+        }
+
         this.netFails++;
         if (this.netFails <= MAX_NET_RETRIES) {
           this.onNotice?.(null, { retry: this.netFails, max: MAX_NET_RETRIES });
@@ -114,7 +155,7 @@ export class LiveSession {
           this.retryAt = Date.now() + Math.min(8000, 1000 * 2 ** (this.netFails - 1));
           return;   // onend schedules the retry
         }
-        this.fail(null, 'lost');
+        this.fail(null, this.triedLocal ? 'lost-both' : 'lost');
         return;
       }
       this.onError?.('Recognition error: ' + e.error);

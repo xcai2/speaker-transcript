@@ -3,7 +3,8 @@ import {
   fmtTime, talkTime,
 } from './transcript.js';
 import { PROVIDERS, summarize, buildPrompt, estimateTokens } from './llm.js';
-import { LiveSession, isSupported as liveSupported, secureOrigin, browserNote, LANGS } from './live.js';
+import { LiveSession, isSupported as liveSupported, secureOrigin, browserNote,
+         localModelState, installLocalModel, probeConnectivity, LANGS } from './live.js';
 import { t, setLang, getLang, detectLang, apply as applyI18n } from './i18n.js';
 
 const API = 'https://api.assemblyai.com/v2';
@@ -235,6 +236,54 @@ function showMode(mode) {
 $('tab-upload').onclick = () => showMode('upload');
 $('tab-live').onclick = () => showMode('live');
 
+let localReady = false;
+
+/* Work out WHY recognition failed and say something actionable, instead of asserting
+   the network is down when it usually isn't. */
+async function diagnose(code) {
+  $('livenote').className = 'note err';
+  $('livenote').textContent = t('live.diagnosing');
+  const online = await probeConnectivity();
+  const local = await localModelState($('lang').value);
+
+  if (online === 'offline') { $('livenote').textContent = t('live.offline'); return; }
+
+  // Reaching the internet but not the speech service means something is blocking it
+  // specifically — an extension, a firewall rule, or regional blocking.
+  const parts = [t('live.blocked')];
+  if (code !== 'lost-both' && (local === 'downloadable' || local === 'available')) {
+    parts.push(t('live.tryLocal'));
+    showInstallButton(local);
+  } else {
+    parts.push(t('live.blockedFix'));
+  }
+  $('livenote').textContent = parts.join(' ');
+}
+
+function showInstallButton(state) {
+  if ($('installlocal')) return;
+  const b = document.createElement('button');
+  b.className = 'bar'; b.id = 'installlocal';
+  b.style.marginTop = '10px';
+  b.textContent = state === 'available' ? t('live.useLocal') : t('live.downloadLocal');
+  b.onclick = async () => {
+    b.disabled = true;
+    b.textContent = t('live.downloading');
+    const ok = await installLocalModel($('lang').value);
+    localReady = ok || (await localModelState($('lang').value)) === 'available';
+    b.remove();
+    $('livenote').className = 'note';
+    $('livenote').textContent = localReady ? t('live.localReady') : t('live.localFailed');
+  };
+  $('pane-live').append(b);
+}
+
+// Check once up front so the very first failure can fall back immediately.
+(async () => {
+  if (!liveSupported()) return;
+  localReady = (await localModelState($('lang').value)) === 'available';
+})();
+
 $('livego').onclick = () => {
   // Treat any active-looking session as stoppable. Keying only off `wanted` meant a
   // session that had already given up left the button unresponsive.
@@ -271,17 +320,19 @@ $('livego').onclick = () => {
       if (running) { $('livenote').className = 'note'; $('livenote').textContent = t('live.listening'); }
     },
     onError: (msg, code) => {
-      $('livenote').className = 'note err';
-      $('livenote').textContent = code === 'lost' ? t('live.lost') : msg;
+      if (code === 'lost' || code === 'lost-both') diagnose(code);
+      else { $('livenote').className = 'note err'; $('livenote').textContent = msg; }
     },
     // transient reconnects are informational, not errors
     onNotice: (msg, info) => {
       $('livenote').className = 'note';
+      if (info && info.switchingLocal) { $('livenote').textContent = t('live.switchingLocal'); return; }
       $('livenote').textContent = info
         ? `${t('live.reconnecting')} (${info.retry}/${info.max})…`
         : (msg || (live && live.wanted ? t('live.listening') : ''));
     },
   });
+  live.canTryLocal = localReady;
   live.start();
   window.__live = live;   // exposed for tests
 };
