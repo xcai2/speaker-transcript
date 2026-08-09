@@ -236,7 +236,9 @@ $('tab-upload').onclick = () => showMode('upload');
 $('tab-live').onclick = () => showMode('live');
 
 $('livego').onclick = () => {
-  if (live && live.wanted) { stopLive(); return; }
+  // Treat any active-looking session as stoppable. Keying only off `wanted` meant a
+  // session that had already given up left the button unresponsive.
+  if (live && (live.wanted || live.running)) { stopLive(); return; }
   // fail early with a useful message rather than a bare 'network' error later
   if (!secureOrigin()) {
     $('livenote').className = 'note err';
@@ -288,10 +290,14 @@ function stopLive() {
   if (!live) return;
   live.stop();
   $('interim').textContent = '';
+  // the session is over either way — make sure the button reflects that
+  $('livego').classList.remove('listening');
+  $('livego').textContent = t('live.start');
   const segs = live.toSegments();
   if (!segs.length) {
     $('livenote').className = 'note';
     $('livenote').textContent = t('live.nothing');
+    live = null;
     return;
   }
   // hand the captured text to the same pipeline the upload path uses

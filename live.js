@@ -63,13 +63,15 @@ export class LiveSession {
     this.onFinal = onFinal; this.onInterim = onInterim;
     this.onState = onState; this.onError = onError; this.onNotice = onNotice;
 
-    // Audio flowing again means the connection recovered; forget earlier failures
-    // so a long session isn't killed by unrelated blips accumulating.
-    this.rec.onaudiostart = () => {
+    // Only a real result proves the service is working. onaudiostart fires whenever the
+    // mic opens — including on a doomed retry — so resetting there let a permanently
+    // broken connection loop forever at "1/4" and never reach the give-up path.
+    this.markHealthy = () => {
       if (this.netFails) { this.netFails = 0; this.onNotice?.(''); }
     };
 
     this.rec.onresult = e => {
+      this.markHealthy();   // recognition is genuinely working
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const r = e.results[i];
@@ -107,7 +109,9 @@ export class LiveSession {
         this.netFails++;
         if (this.netFails <= MAX_NET_RETRIES) {
           this.onNotice?.(null, { retry: this.netFails, max: MAX_NET_RETRIES });
-          this.retryAt = Date.now() + this.netFails * 1200;
+          // exponential-ish backoff: 1s, 2s, 4s, 8s — gives a flaky service time to
+          // recover instead of hammering it, and keeps the notice readable
+          this.retryAt = Date.now() + Math.min(8000, 1000 * 2 ** (this.netFails - 1));
           return;   // onend schedules the retry
         }
         this.fail(null, 'lost');
@@ -151,10 +155,16 @@ export class LiveSession {
     catch (e) { this.onError?.(e.message || String(e)); }
   }
 
+  /* Stop must always reset the UI. If the engine is mid-retry it isn't actually running,
+     so rec.stop() is a no-op and no 'end' event ever arrives — previously that left the
+     button stuck on "Stop listening" forever. Settle the state here instead of waiting. */
   stop() {
     this.wanted = false;
     clearTimeout(this.retryTimer);
+    this.retryAt = 0;
     try { this.rec.stop(); } catch { /* not running */ }
+    try { this.rec.abort(); } catch { /* not running */ }
+    if (this.running) { this.running = false; this.onState?.('stopped'); }
   }
 
   setLang(lang) {
