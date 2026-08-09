@@ -6,8 +6,8 @@
 
 Turn any recording into a speaker-separated, searchable transcript — every sentence labelled
 by speaker, each one clickable to play that exact moment, with AI summaries and export to
-text, Markdown, subtitles or JSON. Or switch to **live captions** and transcribe straight
-from your microphone, free and with no API key.
+text, Markdown, subtitles or JSON. Upload a file, or **record straight from your microphone**
+and get the same complete, speaker-separated result.
 
 It runs **entirely in your browser** with **your own API key**. Your audio goes straight from
 your machine to the transcription provider you chose. There is no server in the middle,
@@ -35,10 +35,9 @@ under NDA — cloud transcription is usually off the table. That's the gap this 
 
 ## Features
 
-- **Two modes** — upload a file for speaker-separated transcripts, or live captions from your mic
-- **Live captions** — real-time transcription in 10 languages using the browser's own speech
-  engine. Free, no API key, nothing uploaded. Stop, and it becomes a normal transcript you can
-  search, summarize and export.
+- **Two modes** — upload a file, or record from your microphone
+- **Recording** — captures the audio, then transcribes the complete file, so nothing is lost
+  and you still get speaker separation. Live captions show while you record as a rough preview.
 - **Speaker separation** — up to six speakers, colour-coded
 - **Click any line to play it** — jumps straight to that moment
 - **Rename speakers** — "Speaker A" → "Sarah", updates everywhere including exports
@@ -57,11 +56,17 @@ Open the [demo](https://xcai2.github.io/timbrio/) and pick a mode:
 **📁 Upload a recording** — paste your AssemblyAI key into Settings, then drop in a file.
 Gives you speaker separation and the highest accuracy.
 
-**🎙 Live captions** — click Start listening and talk. No key, no cost. No speaker separation
-in this mode, and note that browsers implement this by sending audio to their own speech
-service (Google's, in Chrome) — so for confidential material, use Upload mode instead.
+**🎙 Record** — click Start recording and talk. The audio is captured in your browser and
+transcribed the same way an uploaded file is, so you get every sentence plus speaker
+separation. If transcription fails, the recording is offered as a download so it is never
+lost.
 
-![Live captions](docs/live.png)
+![Recording](docs/live.png)
+
+> Why not stream the audio for live transcription? The browser's Web Speech API is a
+> dictation API: it discards audio it cannot finalize and times out on silence, so a real
+> conversation loses sentences. Recording first and transcribing the complete file is the
+> only way to be sure nothing is missed.
 
 Optionally add a model provider key for AI summaries in either mode.
 
@@ -122,7 +127,8 @@ responsible for having the right to record and process any audio you use here.
 |---|---|
 | `index.html` | The web app |
 | `app.js` | Upload, transcription, rendering, search, summary |
-| `live.js` | Live captions via the Web Speech API |
+| `record.js` | Microphone capture via MediaRecorder |
+| `live.js` | Live caption preview via the Web Speech API |
 | `i18n.js` | English / 中文 interface strings |
 | `transcript.js` | Sentence splitting and every export format |
 | `llm.js` | Model provider clients |

@@ -113,7 +113,7 @@
 
   <div class="tabs">
     <button class="tab active" id="tab-upload" data-i18n="tab.upload">📁 Upload a recording</button>
-    <button class="tab" id="tab-live" data-i18n="tab.live">🎙 Live captions</button>
+    <button class="tab" id="tab-live" data-i18n="tab.live">🎙 Record</button>
   </div>
 
   <div class="panel" id="pane-upload">
@@ -132,21 +132,24 @@
   </div>
 
   <div class="panel" id="pane-live" style="display:none">
-    <h2 data-i18n="live.title">Live captions</h2>
-    <p class="sub" data-i18n="live.sub">Transcribes from your microphone as you speak, using your
-      browser's built-in speech engine — <strong>free, no API key</strong>. When you stop, the text
-      becomes a normal transcript you can search, summarize and export.
-      <br>No speaker separation in this mode — use Upload for that. Note that browsers implement this
-      by sending audio to their own speech service (Google's, in Chrome), so for confidential
-      material use Upload mode instead.</p>
+    <h2 data-i18n="live.title">Record</h2>
+    <p class="sub" data-i18n="live.sub">Records from your microphone, then transcribes the
+      complete recording — so you get <strong>every sentence and speaker separation</strong>,
+      exactly like uploading a file. Live captions appear while you record as a rough preview;
+      the accurate transcript replaces them when you stop.</p>
+
     <div class="row-2">
-      <div>
-        <label class="field" for="lang" data-i18n="live.lang">Speech language</label>
+      <button class="bar primary" id="livego" data-i18n="live.start">● Start recording</button>
+      <div id="rectime">00:00</div>
+      <div style="flex:1"></div>
+      <div style="flex:0 0 auto">
+        <label class="field" for="lang" data-i18n="live.lang">Preview language</label>
         <select id="lang"></select>
       </div>
-      <button class="bar primary" id="livego" data-i18n="live.start">● Start listening</button>
     </div>
+
     <div id="meterwrap" aria-hidden="true"><div id="meter"></div></div>
+
     <div id="livebox" data-empty="Captions will appear here…">
       <div id="livetext"></div>
       <span id="interim"></span>

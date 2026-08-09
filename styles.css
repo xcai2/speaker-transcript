@@ -158,6 +158,9 @@ input:focus, select:focus { outline: none; border-color: var(--v-400);
 
 /* mic level: shows the mic is picking you up even when the recognizer is between
    sessions, so silence is distinguishable from a dead input */
+#rectime { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums;
+           color: var(--muted); min-width: 74px; }
+#rectime.live { color: var(--brand); }
 #meterwrap { display: none; height: 5px; border-radius: 3px; background: var(--line);
              margin-top: 12px; overflow: hidden; }
 #meterwrap.show { display: block; }

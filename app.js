@@ -3,6 +3,7 @@ import {
   fmtTime, talkTime,
 } from './transcript.js';
 import { PROVIDERS, summarize, buildPrompt, estimateTokens } from './llm.js';
+import { Recorder, recordingSupported } from './record.js';
 import { LiveSession, isSupported as liveSupported, secureOrigin, browserNote,
          localModelState, installLocalModel, probeConnectivity, LANGS } from './live.js';
 import { t, setLang, getLang, detectLang, apply as applyI18n } from './i18n.js';
@@ -167,44 +168,50 @@ function say(msg, isErr) {
   statusEl.className = 'show' + (isErr ? ' err' : '');
 }
 
-/* ---------------- transcribe ---------------- */
+/* ---------------- transcribe ----------------
+   Shared by the Upload tab and the Record tab: both end up with a File and want the
+   same speaker-separated result, so there is one implementation. */
+async function transcribeFile(file, key, progress) {
+  progress(t('upload.uploading') + ' ' + file.name + '…');
+  const up = await fetch(API + '/upload', {
+    method: 'POST', headers: { authorization: key }, body: file,
+  });
+  if (!up.ok) throw new Error('Upload failed (' + up.status + '). '
+    + (up.status === 401 ? 'That API key was rejected.' : await up.text()));
+  const { upload_url } = await up.json();
+
+  progress(t('upload.queued'));
+  const post = await fetch(API + '/transcript', {
+    method: 'POST',
+    headers: { authorization: key, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      audio_url: upload_url,
+      speaker_labels: true,
+      speech_models: ['universal-3-pro', 'universal-2'],
+    }),
+  });
+  if (!post.ok) throw new Error('Could not start transcription. ' + await post.text());
+  const { id } = await post.json();
+
+  const started = Date.now();
+  for (;;) {
+    await new Promise(r => setTimeout(r, 4000));
+    const res = await fetch(API + '/transcript/' + id, { headers: { authorization: key } });
+    const job = await res.json();
+    if (job.status === 'completed') return job;
+    if (job.status === 'error') throw new Error(job.error || 'Transcription failed.');
+    const el = Date.now() - started;
+    progress(t('upload.working') + ' ' + Math.floor(el / 60000) + 'm '
+      + String(Math.floor(el / 1000) % 60).padStart(2, '0') + 's ' + t('upload.elapsed'));
+  }
+}
+
 $('go').onclick = async () => {
   const key = keyInput.value.trim();
   if (!picked || !key) return;
   $('go').disabled = true;
   try {
-    say(t('upload.uploading') + ' ' + picked.name + '…');
-    const up = await fetch(API + '/upload', {
-      method: 'POST', headers: { authorization: key }, body: picked,
-    });
-    if (!up.ok) throw new Error('Upload failed (' + up.status + '). '
-      + (up.status === 401 ? 'That API key was rejected.' : await up.text()));
-    const { upload_url } = await up.json();
-
-    say(t('upload.queued'));
-    const post = await fetch(API + '/transcript', {
-      method: 'POST',
-      headers: { authorization: key, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        audio_url: upload_url,
-        speaker_labels: true,
-        speech_models: ['universal-3-pro', 'universal-2'],
-      }),
-    });
-    if (!post.ok) throw new Error('Could not start transcription. ' + await post.text());
-    const { id } = await post.json();
-
-    const started = Date.now();
-    for (;;) {
-      await new Promise(r => setTimeout(r, 4000));
-      const res = await fetch(API + '/transcript/' + id, { headers: { authorization: key } });
-      const job = await res.json();
-      if (job.status === 'completed') { render(job); break; }
-      if (job.status === 'error') throw new Error(job.error || 'Transcription failed.');
-      const el = Date.now() - started;
-      say(t('upload.working') + ' ' + Math.floor(el / 60000) + 'm '
-        + String(Math.floor(el / 1000) % 60).padStart(2, '0') + 's ' + t('upload.elapsed'));
-    }
+    render(await transcribeFile(picked, key, say));
   } catch (e) {
     say(e.message || String(e), true);
   } finally {
@@ -212,7 +219,12 @@ $('go').onclick = async () => {
   }
 };
 
-/* ---------------- live captions ---------------- */
+/* ---------------- record ----------------
+   MediaRecorder captures the audio; AssemblyAI transcribes the complete file. Live
+   captions run alongside purely as a preview, because the Web Speech API drops speech
+   it cannot finalize and can never be made reliable enough to be the record itself. */
+let recorder = null;
+
 for (const [code, label] of LANGS) $('lang').append(new Option(label, code));
 $('lang').value = localStorage.getItem('live_lang') || 'en-US';
 $('lang').onchange = () => {
@@ -226,150 +238,127 @@ function showMode(mode) {
   $('pane-live').style.display = up ? 'none' : '';
   $('tab-upload').classList.toggle('active', up);
   $('tab-live').classList.toggle('active', !up);
-  if (!up && !liveSupported()) {
+  if (!up && !recordingSupported()) {
     $('livego').disabled = true;
     $('livenote').className = 'note err';
-    $('livenote').textContent =
-      t('live.unsupported');
+    $('livenote').textContent = t('live.unsupported');
   }
 }
 $('tab-upload').onclick = () => showMode('upload');
 $('tab-live').onclick = () => showMode('live');
 
-let localReady = false;
+const mmss = ms => String(Math.floor(ms / 60000)).padStart(2, '0') + ':'
+                 + String(Math.floor(ms / 1000) % 60).padStart(2, '0');
 
-/* Work out WHY recognition failed and say something actionable, instead of asserting
-   the network is down when it usually isn't. */
-async function diagnose(code) {
-  $('livenote').className = 'note err';
-  $('livenote').textContent = t('live.diagnosing');
-  const online = await probeConnectivity();
-  const local = await localModelState($('lang').value);
+$('livego').onclick = async () => {
+  if (recorder && recorder.active) { finishRecording(); return; }
 
-  if (online === 'offline') { $('livenote').textContent = t('live.offline'); return; }
-
-  // Reaching the internet but not the speech service means something is blocking it
-  // specifically — an extension, a firewall rule, or regional blocking.
-  const parts = [t('live.blocked')];
-  if (code !== 'lost-both' && (local === 'downloadable' || local === 'available')) {
-    parts.push(t('live.tryLocal'));
-    showInstallButton(local);
-  } else {
-    parts.push(t('live.blockedFix'));
-  }
-  $('livenote').textContent = parts.join(' ');
-}
-
-function showInstallButton(state) {
-  if ($('installlocal')) return;
-  const b = document.createElement('button');
-  b.className = 'bar'; b.id = 'installlocal';
-  b.style.marginTop = '10px';
-  b.textContent = state === 'available' ? t('live.useLocal') : t('live.downloadLocal');
-  b.onclick = async () => {
-    b.disabled = true;
-    b.textContent = t('live.downloading');
-    const ok = await installLocalModel($('lang').value);
-    localReady = ok || (await localModelState($('lang').value)) === 'available';
-    b.remove();
-    $('livenote').className = 'note';
-    $('livenote').textContent = localReady ? t('live.localReady') : t('live.localFailed');
-  };
-  $('pane-live').append(b);
-}
-
-// Check once up front so the very first failure can fall back immediately.
-(async () => {
-  if (!liveSupported()) return;
-  localReady = (await localModelState($('lang').value)) === 'available';
-})();
-
-$('livego').onclick = () => {
-  // Treat any active-looking session as stoppable. Keying only off `wanted` meant a
-  // session that had already given up left the button unresponsive.
-  if (live && (live.wanted || live.running)) { stopLive(); return; }
-  // fail early with a useful message rather than a bare 'network' error later
-  if (!secureOrigin()) {
+  const key = keyInput.value.trim();
+  if (!key) {
+    $('setup').classList.remove('collapsed');
+    syncSettingsToggle();
     $('livenote').className = 'note err';
-    $('livenote').textContent = t('live.insecure');
+    $('livenote').textContent = t('live.needkey');
     return;
   }
-  const warn = browserNote();
-  if (warn) { $('livenote').className = 'note err'; $('livenote').textContent = warn; return; }
 
-  const liveText = $('livetext');
-  liveText.textContent = '';
+  $('livetext').textContent = '';
   $('interim').textContent = '';
+  $('livenote').className = 'note';
+  $('livenote').textContent = t('live.recording');
 
-  live = new LiveSession({
-    lang: $('lang').value,
-    onFinal: ({ text, at }) => {
-      const p = document.createElement('p');
-      const ts = document.createElement('span');
-      ts.className = 'time';
-      ts.textContent = fmtTime(at) + '  ';
-      p.append(ts, document.createTextNode(text));
-      liveText.append(p);
-      $('livebox').scrollTop = $('livebox').scrollHeight;
-    },
-    onInterim: t => { $('interim').textContent = t; },
-    onState: state => {
-      const running = state === 'running';
-      $('livego').classList.toggle('listening', running);
-      $('livego').textContent = running ? t('live.stop') : t('live.start');
-      if (running) { $('livenote').className = 'note'; $('livenote').textContent = t('live.listening'); }
-    },
+  recorder = new Recorder({
     onLevel: v => {
-      $('meterwrap').classList.toggle('show', !!(live && live.wanted));
+      $('meterwrap').classList.add('show');
       $('meter').style.width = Math.round(v * 100) + '%';
     },
-    onError: (msg, code) => {
-      if (code === 'lost' || code === 'lost-both') diagnose(code);
-      else { $('livenote').className = 'note err'; $('livenote').textContent = msg; }
-    },
-    // transient reconnects are informational, not errors
-    onNotice: (msg, info) => {
-      $('livenote').className = 'note';
-      if (info && info.switchingLocal) { $('livenote').textContent = t('live.switchingLocal'); return; }
-      $('livenote').textContent = info
-        ? `${t('live.reconnecting')} (${info.retry}/${info.max})…`
-        : (msg || (live && live.wanted ? t('live.listening') : ''));
-    },
+    onTick: ms => { $('rectime').textContent = mmss(ms); },
+    onError: msg => { $('livenote').className = 'note err'; $('livenote').textContent = msg; },
   });
-  live.canTryLocal = localReady;
-  live.start();
-  window.__live = live;   // exposed for tests
-};
 
-function stopLive() {
-  if (!live) return;
-  live.stop();
-  $('interim').textContent = '';
-  // the session is over either way — make sure the button reflects that
-  $('livego').classList.remove('listening');
-  $('livego').textContent = t('live.start');
-  $('meterwrap').classList.remove('show');
-  const segs = live.toSegments();
-  if (!segs.length) {
-    $('livenote').className = 'note';
-    $('livenote').textContent = t('live.nothing');
-    live = null;
+  try {
+    await recorder.start();
+  } catch (e) {
+    recorder = null;
+    $('livenote').className = 'note err';
+    $('livenote').textContent = e.name === 'NotAllowedError'
+      ? t('live.micdenied') : (e.message || String(e));
     return;
   }
-  // hand the captured text to the same pipeline the upload path uses
-  segments = segs;
-  names = { A: t('speaker.me') };
-  baseName = 'live-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
-  audio.removeAttribute('src');
-  $('player').classList.remove('show');
-  $('toolbar').classList.add('show');
-  $('hint').textContent = t('hint.live');
-  drawRows();
-  drawStats();
-  applySearch();
-  $('livenote').className = 'note';
-  $('livenote').textContent = segs.length + ' ' + t('live.captured');
-  $('list').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  $('livego').classList.add('listening');
+  $('livego').textContent = t('live.stop');
+  $('rectime').classList.add('live');
+
+  // Best-effort preview. If it fails there is nothing to fix — the recording is the record.
+  if (liveSupported() && secureOrigin()) {
+    live = new LiveSession({
+      lang: $('lang').value,
+      onFinal: ({ text }) => {
+        const p = document.createElement('p');
+        p.textContent = text;
+        $('livetext').append(p);
+        $('livebox').scrollTop = $('livebox').scrollHeight;
+      },
+      onInterim: txt => { $('interim').textContent = txt; },
+      onState: () => {}, onError: () => {}, onNotice: () => {},
+    });
+    live.canTryLocal = localReady;
+    live.start();
+    window.__live = live;
+  }
+};
+
+async function finishRecording() {
+  const key = keyInput.value.trim();
+  $('livego').disabled = true;
+  $('livego').classList.remove('listening');
+  $('rectime').classList.remove('live');
+  $('meterwrap').classList.remove('show');
+  $('interim').textContent = '';
+  if (live) { live.stop(); live = null; }
+
+  const file = await recorder.stop();
+  recorder = null;
+  $('livego').textContent = t('live.start');
+
+  if (!file.size) {
+    $('livenote').className = 'note err';
+    $('livenote').textContent = t('live.nothing');
+    $('livego').disabled = false;
+    return;
+  }
+
+  const note = msg => { $('livenote').className = 'note'; $('livenote').textContent = msg; };
+  try {
+    note(t('live.transcribing'));
+    picked = file;                       // so playback and exports use this audio
+    const job = await transcribeFile(file, key, note);
+    render(job);
+    note(t('live.done'));
+  } catch (e) {
+    $('livenote').className = 'note err';
+    $('livenote').textContent = (e.message || String(e)) + ' ' + t('live.keptAudio');
+    offerDownload(file);
+  } finally {
+    $('livego').disabled = false;
+  }
+}
+
+/* If transcription fails, the recording still exists — never make the user lose it. */
+function offerDownload(file) {
+  if ($('saverec')) $('saverec').remove();
+  const b = document.createElement('button');
+  b.className = 'bar'; b.id = 'saverec'; b.style.marginTop = '10px';
+  b.textContent = t('live.download');
+  b.onclick = () => {
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url; a.download = file.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  };
+  $('pane-live').append(b);
 }
 
 /* ---------------- render ---------------- */
