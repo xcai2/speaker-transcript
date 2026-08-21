@@ -155,9 +155,17 @@
 
     <div class="row-2">
       <button class="bar primary" id="livego" data-i18n="live.start">● Start recording</button>
-      <div id="rectime">00:00</div>
-      <div style="flex:1"></div>
-      <div style="flex:0 0 auto">
+      <div id="rectime" class="fixed">00:00</div>
+      <div class="spring"></div>
+      <div class="field-group">
+        <label class="field" for="source" data-i18n="live.source">Audio source</label>
+        <select id="source">
+          <option value="mic" data-i18n="live.sourceMic">🎤 Microphone</option>
+          <option value="system" data-i18n="live.sourceSystem">🔊 Computer audio</option>
+          <option value="both" data-i18n="live.sourceBoth">🎤+🔊 Both</option>
+        </select>
+      </div>
+      <div class="field-group">
         <label class="field" for="lang" data-i18n="live.lang">Preview language</label>
         <select id="lang"></select>
       </div>

@@ -130,6 +130,12 @@ input:focus, select:focus { outline: none; border-color: var(--v-400);
 .row-2 { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
 .row-2 > div { flex: 1; min-width: 200px; }
 .row-2 > button { flex: none; }
+/* Opt-outs from the 200px floor above. The Record row carries a timer, a spring and two
+   labelled selects; without these the floor alone demands more width than the row has,
+   and the wrap pushes an empty spacer over the tabs. */
+.row-2 > .fixed { flex: 0 0 auto; min-width: 0; }
+.row-2 > .spring { flex: 1 1 auto; min-width: 0; }
+.row-2 > .field-group { flex: 0 1 auto; min-width: 150px; }
 .note { font-size: 12px; color: var(--faint); margin-top: 9px; line-height: 1.55; }
 .note.err { color: var(--err); }
 .sep { height: 1px; background: var(--line); margin: 18px 0; }
