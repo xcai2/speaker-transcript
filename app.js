@@ -3,8 +3,10 @@ import {
   fmtTime, talkTime,
 } from './transcript.js';
 import { PROVIDERS, summarize, buildPrompt, estimateTokens } from './llm.js';
-import { Recorder, recordingSupported } from './record.js';
+import { Recorder, recordingSupported, systemAudioSupported,
+         NoSystemAudioError } from './record.js';
 import { LiveStream } from './stream.js';
+import { PipWindow, supported as pipSupported } from './pip.js';
 import { LiveSession, isSupported as liveSupported, secureOrigin, browserNote,
          localModelState, installLocalModel, probeConnectivity, LANGS } from './live.js';
 import { t, setLang, getLang, detectLang, apply as applyI18n } from './i18n.js';
@@ -267,8 +269,17 @@ $('go').onclick = async () => {
    it cannot finalize and can never be made reliable enough to be the record itself. */
 let recorder = null;
 let liveStream = null;
+let pip = null;             // floating always-on-top window, while recording
+let finals = [];            // { text, gap } per completed turn, mirrored into the PiP window
 
 for (const [code, label] of LANGS) $('lang').append(new Option(label, code));
+$('source').value = localStorage.getItem('live_source') || 'mic';
+$('source').onchange = () => localStorage.setItem('live_source', $('source').value);
+if (!systemAudioSupported()) {
+  // Keep the control visible but honest: the options simply cannot work here.
+  for (const o of $('source').options) if (o.value !== 'mic') o.disabled = true;
+}
+
 $('lang').value = localStorage.getItem('live_lang') || 'en-US';
 $('lang').onchange = () => {
   localStorage.setItem('live_lang', $('lang').value);
@@ -308,15 +319,22 @@ $('livego').onclick = async () => {
   $('livetext').textContent = '';
   $('interim').textContent = '';
   $('livenote').className = 'note';
-  $('livenote').textContent = t('live.recording');
+  $('livenote').textContent = $('source').value === 'mic'
+    ? t('live.recording') : t('live.sysHint');
+  finals = [];
 
   recorder = new Recorder({
     onLevel: v => {
       $('meterwrap').classList.add('show');
       $('meter').style.width = Math.round(v * 100) + '%';
+      pip?.setLevel(v);
     },
-    onTick: ms => { $('rectime').textContent = mmss(ms); },
+    onTick: ms => { $('rectime').textContent = mmss(ms); pip?.setTime(mmss(ms)); },
     onError: msg => { $('livenote').className = 'note err'; $('livenote').textContent = msg; },
+    // Chrome's own "Stop sharing" banner ends the capture behind our back; finish the
+    // recording properly so the audio is still transcribed rather than silently dropped.
+    onEnded: () => { if (recorder?.active) finishRecording(); },
+    source: $('source').value,
   });
 
   try {
@@ -324,8 +342,11 @@ $('livego').onclick = async () => {
   } catch (e) {
     recorder = null;
     $('livenote').className = 'note err';
-    $('livenote').textContent = e.name === 'NotAllowedError'
-      ? t('live.micdenied') : (e.message || String(e));
+    const usingSystem = $('source').value !== 'mic';
+    $('livenote').textContent =
+        e instanceof NoSystemAudioError ? t('live.noSysAudio')
+      : e.name === 'NotAllowedError'    ? (usingSystem ? t('live.shareDenied') : t('live.micdenied'))
+      : (e.message || String(e));
     return;
   }
 
@@ -340,14 +361,44 @@ $('livego').onclick = async () => {
     apiKey: key,
     stream: recorder.stream,
     lang: $('lang').value,
-    onPartial: txt => { $('interim').textContent = txt; $('livebox').scrollTop = $('livebox').scrollHeight; },
-    onFinal: txt => {
+    onPartial: txt => {
+      $('interim').textContent = txt;
+      $('livebox').scrollTop = $('livebox').scrollHeight;
+      /* The pause that precedes a turn is only known once the turn closes and the API
+         reports its word timings, so a live line has no measurement of its own. Wall-clock
+         timing cannot stand in: turns are delivered after end-of-speech is detected, so the
+         interval between messages reflects network and processing latency — a couple of
+         hundred milliseconds regardless of how long the speaker actually paused.
+
+         So the live line simply continues the current paragraph, and is regrouped from the
+         real audio timings the moment it completes. Continuing is the safer provisional
+         choice: joining then splitting reads as the text settling, whereas starting a new
+         paragraph that later merges would pull text upward under the reader's eye. */
+      pip?.setCaptions(finals, txt, 0);
+    },
+    onFinal: (txt, gapMs) => {
       const p = document.createElement('p');
       p.textContent = txt;
       $('livetext').append(p);
       $('interim').textContent = '';
+      // Measured on the audio timeline by the API, so it reflects the speaker's actual
+      // pause rather than how quickly the network delivered the message.
+      const gap = gapMs || 0;
+      // The page keeps one paragraph per turn; only the floating window, which is short,
+      // needs to economise on lines, so the gap travels with the text for it to use.
+      finals.push({ text: txt, gap });
       if ($('clearlive')) $('clearlive').style.display = 'inline-flex';
       $('livebox').scrollTop = $('livebox').scrollHeight;
+      pip?.setCaptions(finals, '');
+    },
+    // The same turn, re-sent with punctuation. Revise the line in place so the reader sees
+    // it improve rather than seeing it repeated.
+    onReplace: txt => {
+      if (!finals.length) return;
+      finals[finals.length - 1].text = txt;
+      const last = $('livetext').lastElementChild;
+      if (last) last.textContent = txt;
+      pip?.setCaptions(finals, '');
     },
     onState: st => {
       if (st === 'connected') { $('livenote').className = 'note'; $('livenote').textContent = t('live.recording'); }
@@ -355,7 +406,62 @@ $('livego').onclick = async () => {
     onError: msg => { $('livenote').className = 'note'; $('livenote').textContent = msg + ' ' + t('live.stillRecording'); },
   });
   liveStream.start().catch(() => {});
+
+  // Float the session above other apps, so it stays visible once the user switches to
+  // the call they are recording. Best-effort: unsupported browsers, and a user who
+  // dismisses the window, both just keep the in-page view.
+  openPip();
 };
+
+/* ---------------- floating window ----------------
+   The PiP window is a *view* onto the recording, never the recording itself: the Recorder
+   and the LiveStream are untouched by opening or closing it. That separation is what makes
+   it safe for the window to be closed at any moment. */
+async function openPip() {
+  if (!pipSupported() || pip) return;
+  const p = new PipWindow({
+    onStop: () => finishRecording(),
+    onClose: () => {
+      pip = null;
+      $('livenote').className = 'note';
+      $('livenote').textContent = t('live.recording');
+      showPipButton();          // closing the view never stops the take
+    },
+  });
+  try {
+    await p.start({
+      labels: {
+        title: t('live.pipTitle'),
+        stop:  t('live.pipStop'),
+        empty: t('live.empty'),
+      },
+    });
+  } catch {
+    /* Chrome requires a live user gesture, and awaiting the microphone permission prompt
+       can outlive the one from the Start click — reliably so on a first run, where the
+       user spends seconds on the permission dialog. Recording is already underway and
+       must not be disturbed, so offer the window as an explicit second click instead. */
+    showPipButton();
+    return;
+  }
+  pip = p;
+  pip.setTime(mmss(recorder ? recorder.elapsed : 0));
+  pip.setCaptions(finals, $('interim').textContent);
+  $('pipbtn')?.remove();
+  $('livenote').className = 'note';
+  $('livenote').textContent = t('live.pipOpen');
+}
+
+/* Shown when the window could not be opened automatically, or after the user closes it —
+   in both cases a plain click carries the user activation the API insists on. */
+function showPipButton() {
+  if (!pipSupported() || !recorder?.active || $('pipbtn')) return;
+  const b = document.createElement('button');
+  b.className = 'bar'; b.id = 'pipbtn'; b.style.marginTop = '10px';
+  b.textContent = t('live.pipOpenBtn');
+  b.onclick = () => openPip();
+  $('livenote').after(b);
+}
 
 async function finishRecording() {
   const key = keyInput.value.trim();
@@ -366,6 +472,8 @@ async function finishRecording() {
   $('interim').textContent = '';
   if (liveStream) { liveStream.stop(); liveStream = null; }
   if (live) { live.stop(); live = null; }
+  if (pip) { pip.close(); pip = null; }   // the transcript belongs in the page
+  $('pipbtn')?.remove();
 
   const file = await recorder.stop();
   recorder = null;

@@ -44,17 +44,23 @@ registerProcessor('pcm-processor', PCMProcessor);
 
 export class LiveStream {
   /* onPartial(text)  — the current in-progress turn, replaced as it updates
-     onFinal(text)    — a completed turn
+     onReplace(text) — better-punctuated text for the turn just emitted; revise, don't add
+     onFinal(text, gapMs) — a completed turn, and the silence that preceded it. The API
+                     labels turns, never identities, so that gap is the only clue available
+                     live as to whether the speaker changed: a long pause usually means a
+                     handover, a short one is the same person drawing breath.
      onState(state)   — 'connected' | 'closed'
      onError(message) */
-  constructor({ apiKey, stream, lang, onPartial, onFinal, onState, onError }) {
+  constructor({ apiKey, stream, lang, onPartial, onFinal, onReplace, onState, onError }) {
     this.apiKey = apiKey;
     this.lang = lang || 'en';
     this.stream = stream;         // reuse the recorder's MediaStream: one mic permission
-    this.onPartial = onPartial; this.onFinal = onFinal;
+    this.onPartial = onPartial; this.onFinal = onFinal; this.onReplace = onReplace;
     this.onState = onState; this.onError = onError;
     this.ws = null; this.ctx = null; this.node = null;
     this.closing = false;
+    this.lastEnd = null;          // end time of the previous turn, for the gap above
+    this.lastStart = null;        // audio start of the turn already emitted, to spot re-sends
   }
 
   async start() {
@@ -75,7 +81,40 @@ export class LiveStream {
       let d;
       try { d = JSON.parse(e.data); } catch { return; }
       if (d.type === 'Turn' && d.transcript) {
-        if (d.end_of_turn) { this.onFinal?.(d.transcript); this.onPartial?.(''); }
+        if (d.end_of_turn) {
+          /* With format_turns=true a turn can close twice — once raw, then again with
+             punctuation applied — and both copies carry end_of_turn. Emitting both would
+             append every sentence twice and wreck the gap measurement, since by the second
+             copy `lastEnd` already holds this turn's own end and the subtraction goes
+             negative. So a repeat revises the line already shown instead of adding one.
+
+             Word timings are in milliseconds from the start of the stream. */
+          const words = d.words || [];
+          const start = words.length ? words[0].start : null;
+
+          /* Identify a repeat by where it sits on the audio timeline, not by turn_order:
+             a re-send of the same turn necessarily starts at the same instant, whereas
+             turn_order's increment behaviour is not something the docs pin down, and
+             assuming it advances per turn is what previously left every turn after the
+             first stuck as in-progress text. A turn that carries no word timings cannot be
+             matched, so it is always treated as new — duplicating a line is a far smaller
+             failure than never finalising one. */
+          const repeat = start != null && start === this.lastStart;
+          if (repeat) {
+            this.onReplace?.(d.transcript);
+            return;
+          }
+
+          /* The gap is measured from the end of the previous turn to the start of this one;
+             the first turn has nothing to compare against and reports 0. */
+          const gap = (start != null && this.lastEnd != null) ? start - this.lastEnd : 0;
+          if (words.length) {
+            this.lastStart = start;
+            this.lastEnd = words[words.length - 1].end;
+          }
+          this.onFinal?.(d.transcript, Math.max(0, gap));
+          this.onPartial?.('');
+        }
         else this.onPartial?.(d.transcript);
       }
     };
